@@ -1,483 +1,715 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import Image from 'next/image';
+import { useEffect, useMemo, useState } from 'react';
+import { getDateKey, getDateWindowKeys } from '@/lib/date';
+import { fetchJson } from '@/lib/fetch-json';
+import { fetchUpcomingFixtures } from '@/lib/upcoming-fixtures';
+import { StatePanel } from '../components/state-panel';
+import { useLanguage } from '../language-provider';
+import { ComparisonToolbar } from './_components/comparison-toolbar';
+import { HeadToHeadPanel } from './_components/head-to-head-panel';
+import { PlayerStatsPanel } from './_components/player-stats-panel';
+import { RefereeStatsPanel } from './_components/referee-stats-panel';
+import { ScopeToggle } from './_components/scope-toggle';
+import { StatisticsMarketPanel } from './_components/statistics-market-panel';
+import { StatisticsSummaryPanel } from './_components/statistics-summary-panel';
+import { TabsNav, type ComparisonTabId } from './_components/tabs-nav';
+import { TeamPanel } from './_components/team-panel';
+import { TrendPanel } from './_components/trend-panel';
+import { DEFAULT_MARKET_GROUP, DEFAULT_MARKET_LINE, getMarketGroup } from '../market-catalog';
+import { getCompetitionLabel, getTeamName } from './helpers';
+import type {
+    ComparisonScope,
+    ComparisonCoreResponse,
+    HistoricalFixtureRecord,
+    HistoricalMatch,
+    StatisticsCategoryId,
+    TrendCategoryId,
+    UpcomingFixtureRecord,
+} from './types';
 
-const TABS = ['All', 'Recent Matches', 'Predictions', 'Player Stats', 'Referee Stats', 'Statistics', 'Odds'];
+const UPCOMING_DATE_WINDOW_DAYS = 6;
+const EMPTY_COMPARISON_DATA: ComparisonCoreResponse = {
+    awayMatches: [],
+    awaySummary: null,
+    awayTrends: [],
+    headToHeadMatches: [],
+    homeMatches: [],
+    homeSummary: null,
+    homeTrends: [],
+};
 
-// --- EL CEREBRO MATEMÁTICO AVANZADO ---
-
-function getStatValues(match: any, statType: string) {
-  let homeVal = 0;
-  let awayVal = 0;
-  
-  if (statType.includes('Goals') || statType === 'Match Result' || statType === 'Both Teams To Score') {
-    homeVal = match.homeGoals; awayVal = match.awayGoals;
-  } else if (statType.includes('Corners')) {
-    homeVal = match.homeCorners; awayVal = match.awayCorners;
-  } else if (statType.includes('Shots On Target')) {
-    homeVal = match.homeShotsOnTarget; awayVal = match.awayShotsOnTarget;
-  } else if (statType.includes('Shots')) {
-    homeVal = match.homeShots; awayVal = match.awayShots;
-  } else if (statType.includes('Fouls')) {
-    homeVal = match.homeFouls; awayVal = match.awayFouls;
-  } else if (statType.includes('Cards')) {
-    homeVal = match.homeCards; awayVal = match.awayCards;
-  } else if (statType.includes('Booking Points')) {
-    homeVal = match.homeCards * 10 + match.homeRedCards * 15;
-    awayVal = match.awayCards * 10 + match.awayRedCards * 15;
-  }
-  
-  return { homeVal, awayVal };
+function formatShortDate(isoDate: string, locale: string) {
+    return new Intl.DateTimeFormat(locale, {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    })
+        .format(new Date(isoDate))
+        .replace(',', '');
 }
 
-function calculateMatchValue(match: any, statType: string) {
-  const { homeVal, awayVal } = getStatValues(match, statType);
-  const isHome = match.isHome;
-
-  if (statType.includes('Total') || statType.startsWith('Match ')) {
-    if (statType === 'Match Result') return isHome ? (homeVal - awayVal) : (awayVal - homeVal);
-    return homeVal + awayVal;
-  }
-  if (statType === 'Both Teams To Score') {
-    return (homeVal > 0 && awayVal > 0) ? 1 : 0;
-  }
-  if (statType.includes(' For')) {
-    return isHome ? homeVal : awayVal;
-  }
-  if (statType.includes(' Against') || statType.includes(' Ag')) {
-    return isHome ? awayVal : homeVal;
-  }
-  return homeVal + awayVal;
+function formatFixtureDateTime(isoDate: string, locale: string) {
+    return new Intl.DateTimeFormat(locale, {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(new Date(isoDate));
 }
 
-function evaluateHit(value: number, statType: string, market: string) {
-  if (statType === 'Both Teams To Score') return market === 'Yes' ? value === 1 : value === 0;
-  if (statType === 'Match Result') {
-    if (market === 'Win') return value > 0;
-    if (market === 'Draw') return value === 0;
-    if (market === 'Loss') return value < 0;
-  }
-  
-  const line = parseFloat(market.replace('Over ', '').replace('Under ', ''));
-  if (market.includes('Over')) return value > line;
-  if (market.includes('Under')) return value < line;
-  return false;
+function mapFixtureToHistoricalMatch(record: HistoricalFixtureRecord, teamId: number, locale: string): HistoricalMatch {
+    const homeStats = record.fixture_statistics.find(
+        (item) => item.team_id === record.home_team_id && item.period === 'FT',
+    );
+    const awayStats = record.fixture_statistics.find(
+        (item) => item.team_id === record.away_team_id && item.period === 'FT',
+    );
+    const homeStats1H = record.fixture_statistics.find(
+        (item) => item.team_id === record.home_team_id && item.period === '1H',
+    );
+    const awayStats1H = record.fixture_statistics.find(
+        (item) => item.team_id === record.away_team_id && item.period === '1H',
+    );
+    const homeStats2H = record.fixture_statistics.find(
+        (item) => item.team_id === record.home_team_id && item.period === '2H',
+    );
+    const awayStats2H = record.fixture_statistics.find(
+        (item) => item.team_id === record.away_team_id && item.period === '2H',
+    );
+
+    const homeTeamName = getTeamName(record.home_team) ?? 'Home team';
+    const awayTeamName = getTeamName(record.away_team) ?? 'Away team';
+    const isHome = record.home_team_id === teamId;
+
+    return {
+        id: record.id,
+        date: formatShortDate(record.date, locale),
+        opponent: isHome ? awayTeamName : homeTeamName,
+        competitionLabel: getCompetitionLabel(record.league_name),
+        homeTeamName,
+        awayTeamName,
+        homeGoals: record.home_goals ?? 0,
+        awayGoals: record.away_goals ?? 0,
+        homeGoals1H: record.home_goals_1h ?? 0,
+        awayGoals1H: record.away_goals_1h ?? 0,
+        homeGoals2H: (record.home_goals ?? 0) - (record.home_goals_1h ?? 0),
+        awayGoals2H: (record.away_goals ?? 0) - (record.away_goals_1h ?? 0),
+        homeCorners: homeStats?.corners ?? 0,
+        awayCorners: awayStats?.corners ?? 0,
+        homeCorners1H: homeStats1H?.corners ?? 0,
+        awayCorners1H: awayStats1H?.corners ?? 0,
+        homeCorners2H: homeStats2H?.corners ?? 0,
+        awayCorners2H: awayStats2H?.corners ?? 0,
+        homeCards: (homeStats?.yellow_cards ?? 0) + (homeStats?.red_cards ?? 0),
+        awayCards: (awayStats?.yellow_cards ?? 0) + (awayStats?.red_cards ?? 0),
+        homeRedCards: homeStats?.red_cards ?? 0,
+        awayRedCards: awayStats?.red_cards ?? 0,
+        homeBookingPoints: homeStats?.booking_points ?? (homeStats?.yellow_cards ?? 0) * 10 + (homeStats?.red_cards ?? 0) * 25,
+        awayBookingPoints: awayStats?.booking_points ?? (awayStats?.yellow_cards ?? 0) * 10 + (awayStats?.red_cards ?? 0) * 25,
+        homeShots: homeStats?.total_shots ?? 0,
+        awayShots: awayStats?.total_shots ?? 0,
+        homeShotsOnTarget: homeStats?.shots_on_target ?? 0,
+        awayShotsOnTarget: awayStats?.shots_on_target ?? 0,
+        homeFouls: homeStats?.fouls ?? 0,
+        awayFouls: awayStats?.fouls ?? 0,
+        homeOffsides: homeStats?.offsides ?? 0,
+        awayOffsides: awayStats?.offsides ?? 0,
+        homeGoalKicks: homeStats?.goal_kicks ?? 0,
+        awayGoalKicks: awayStats?.goal_kicks ?? 0,
+        homeThrowIns: homeStats?.throw_ins ?? 0,
+        awayThrowIns: awayStats?.throw_ins ?? 0,
+        homeTackles: homeStats?.tackles ?? 0,
+        awayTackles: awayStats?.tackles ?? 0,
+        isHome,
+    };
 }
 
-function calculateMetrics(matches: any[], statType: string, market: string) {
-  if (!matches || matches.length === 0) return { hitRate: 0, hits: 0, total: 0, avg: 0, currentStreak: 0 };
+function summarizeTeamForm(matches: HistoricalMatch[]) {
+    return matches.reduce(
+        (summary, match) => {
+            const teamGoals = match.isHome ? match.homeGoals : match.awayGoals;
+            const opponentGoals = match.isHome ? match.awayGoals : match.homeGoals;
 
-  const total = matches.length;
-  let hits = 0;
-  let sumValues = 0;
-  let currentStreak = 0;
-  let isStreakBroken = false;
+            if (teamGoals > opponentGoals) summary.wins += 1;
+            else if (teamGoals === opponentGoals) summary.draws += 1;
+            else summary.losses += 1;
 
-  matches.forEach((match) => {
-    const value = calculateMatchValue(match, statType);
-    const isHit = evaluateHit(value, statType, market);
+            return summary;
+        },
+        { wins: 0, draws: 0, losses: 0 },
+    );
+}
 
-    if (isHit) hits++;
-    if (statType !== 'Match Result' && statType !== 'Both Teams To Score') sumValues += value;
+function getTabDescription(tab: ComparisonTabId, t: (value: string) => string) {
+    if (tab === 'recent-matches') return t('Recent matches explains the last 10 games, head-to-head record and trend signals for both teams.');
+    if (tab === 'statistics') return t('Statistics compares season market hit rates for both teams using the selected scope.');
+    if (tab === 'player-stats') return t('Player Stats compares player leaders for both teams in the selected league and scope.');
+    if (tab === 'referee-stats') return t('Referee Stats compares the assigned referee with both teams using season averages and market tendencies.');
+    if (tab === 'predictions') return t('Predictions will surface model signals and confidence once this module is ready.');
+    return t('Odds will compare bookmaker pricing and market context once this module is ready.');
+}
 
-    if (isHit && !isStreakBroken) {
-      currentStreak++;
-    } else {
-      isStreakBroken = true;
-    }
-  });
+function getSectionEyebrow(tab: ComparisonTabId, t: (value: string) => string) {
+    if (tab === 'recent-matches') return t('Recent form');
+    if (tab === 'statistics') return t('Season context');
+    if (tab === 'player-stats') return t('Player leaders');
+    if (tab === 'referee-stats') return t('Referee context');
+    if (tab === 'predictions') return t('Model view');
+    return t('Market view');
+}
 
-  return {
-    hitRate: Math.round((hits / total) * 100),
-    hits,
-    total,
-    avg: statType === 'Match Result' || statType === 'Both Teams To Score' ? '-' : (sumValues / total).toFixed(1),
-    currentStreak
-  };
+function useUpcomingFixtures(dateWindow: string[]) {
+    const [fixtures, setFixtures] = useState<UpcomingFixtureRecord[]>([]);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const dateWindowKey = dateWindow.join('|');
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadUpcomingFixtures() {
+            if (dateWindow.length === 0) {
+                setFixtures([]);
+                setErrorMessage(null);
+                setIsLoading(false);
+                return;
+            }
+
+            setIsLoading(true);
+            setErrorMessage(null);
+
+            try {
+                const data = await fetchUpcomingFixtures(dateWindow.length);
+
+                if (cancelled) return;
+
+                setFixtures(data as UpcomingFixtureRecord[]);
+                setIsLoading(false);
+            } catch (error) {
+                if (cancelled) return;
+
+                console.error('Failed to load upcoming fixtures', error);
+                setFixtures([]);
+                setErrorMessage('Upcoming fixtures could not be loaded.');
+                setIsLoading(false);
+            }
+        }
+
+        void loadUpcomingFixtures();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [dateWindow, dateWindowKey]);
+
+    return { errorMessage, fixtures, isLoading };
+}
+
+function useComparisonData(
+    fixtureId: number | null,
+    scope: ComparisonScope,
+    enabled = true,
+) {
+    const [data, setData] = useState<ComparisonCoreResponse>(EMPTY_COMPARISON_DATA);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadComparisonPayload() {
+            if (!enabled || !fixtureId) {
+                setData(EMPTY_COMPARISON_DATA);
+                setErrorMessage(null);
+                setIsLoading(false);
+                return;
+            }
+
+            setIsLoading(true);
+            setErrorMessage(null);
+
+            try {
+                const response = await fetchJson<ComparisonCoreResponse>(
+                    `/api/v1/comparison?fixtureId=${fixtureId}&scope=${scope}`,
+                );
+
+                if (cancelled) return;
+
+                setData(response);
+                setIsLoading(false);
+            } catch (error) {
+                if (cancelled) return;
+
+                console.error('Failed to load comparison data', error);
+                setData(EMPTY_COMPARISON_DATA);
+                setErrorMessage('Comparison data could not be loaded.');
+                setIsLoading(false);
+            }
+        }
+
+        void loadComparisonPayload();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [enabled, fixtureId, scope]);
+
+    return { data, errorMessage, isLoading };
 }
 
 export default function ComparisonPage() {
-  const [activeTab, setActiveTab] = useState('Recent Matches');
-  const [locationToggle, setLocationToggle] = useState('All matches');
-  
-  // Estados para Upcoming Fixtures (El "Cebo")
-  const [upcomingDates, setUpcomingDates] = useState<string[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [upcomingFixtures, setUpcomingFixtures] = useState<any[]>([]);
-  const [selectedFixtureId, setSelectedFixtureId] = useState<number | null>(null);
+    const { locale, t } = useLanguage();
+    const [activeTab, setActiveTab] = useState<ComparisonTabId>('recent-matches');
+    const [scope, setScope] = useState<ComparisonScope>('all');
+    const [selectedDate, setSelectedDate] = useState('');
+    const [selectedFixtureId, setSelectedFixtureId] = useState<number | null>(null);
+    const [appliedQueryFixtureId, setAppliedQueryFixtureId] = useState<number | null>(null);
+    const [requestedFixtureId, setRequestedFixtureId] = useState<number | null>(null);
+    const [homeTeamId, setHomeTeamId] = useState<number | null>(null);
+    const [awayTeamId, setAwayTeamId] = useState<number | null>(null);
+    const [selectedMarketGroupId, setSelectedMarketGroupId] = useState(DEFAULT_MARKET_GROUP.id);
+    const [selectedMarketKey, setSelectedMarketKey] = useState(DEFAULT_MARKET_LINE.key);
+    const [trendCategory, setTrendCategory] = useState<TrendCategoryId>('all');
+    const [statisticsCategory, setStatisticsCategory] = useState<StatisticsCategoryId>('all');
 
-  // Estados para la conexión a Supabase (H2H)
-  const [teams, setTeams] = useState<any[]>([]); 
-  const [homeTeamId, setHomeTeamId] = useState<number | null>(null);
-  const [awayTeamId, setAwayTeamId] = useState<number | null>(null);
-  
-  const [homeFixtures, setHomeFixtures] = useState<any[]>([]);
-  const [awayFixtures, setAwayFixtures] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+    const upcomingDateWindow = useMemo(() => getDateWindowKeys(UPCOMING_DATE_WINDOW_DAYS), []);
+    const { errorMessage: fixturesErrorMessage, fixtures, isLoading: isFixturesLoading } = useUpcomingFixtures(upcomingDateWindow);
+    const showRecentMatches = activeTab === 'recent-matches';
+    const showStatistics = activeTab === 'statistics';
+    const showPlayerStats = activeTab === 'player-stats';
+    const showRefereeStats = activeTab === 'referee-stats';
 
-  // Estados de los selectores (Filtros Maestros)
-  const [homeStatType, setHomeStatType] = useState('Total Match Goals');
-  const [homeMarket, setHomeMarket] = useState('Over 2.5');
-  const [awayStatType, setAwayStatType] = useState('Total Match Goals');
-  const [awayMarket, setAwayMarket] = useState('Over 2.5');
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
 
-  // --- 1. INICIALIZACIÓN ---
-  useEffect(() => {
-    const initData = async () => {
-      const { data: dateData } = await supabase.from('fixtures').select('date').eq('status', 'NS').order('date', { ascending: true });
-      if (dateData && dateData.length > 0) {
-        const uniqueDates = Array.from(new Set(dateData.map(d => d.date.split('T')[0])));
-        setUpcomingDates(uniqueDates as string[]);
-        setSelectedDate(uniqueDates[0] as string);
-      }
-      const { data: teamData } = await supabase.from('teams').select('id, name');
-      if (teamData) setTeams(teamData);
-      setIsLoading(false);
-    };
-    initData();
-  }, []);
+        const nextRequestedFixtureId = Number(new URLSearchParams(window.location.search).get('fixture') ?? '');
+        if (!Number.isFinite(nextRequestedFixtureId) || nextRequestedFixtureId <= 0) {
+            return;
+        }
 
-  // --- 2. CAMBIO DE FECHA ---
-  useEffect(() => {
-    const fetchFixturesForDate = async () => {
-      if (!selectedDate) return;
-      const { data } = await supabase
-        .from('fixtures')
-        .select(`id, date, home_team_id, away_team_id, league_id, home_team:teams!fixtures_home_team_id_fkey(name), away_team:teams!fixtures_away_team_id_fkey(name)`)
-        .eq('status', 'NS').gte('date', `${selectedDate}T00:00:00`).lte('date', `${selectedDate}T23:59:59`).order('date', { ascending: true });
-      if (data && data.length > 0) {
-        setUpcomingFixtures(data);
-        setSelectedFixtureId(data[0].id);
-      } else {
-        setUpcomingFixtures([]);
-        setSelectedFixtureId(null);
-      }
-    };
-    fetchFixturesForDate();
-  }, [selectedDate]);
+        queueMicrotask(() => {
+            setRequestedFixtureId(nextRequestedFixtureId);
+        });
+    }, []);
 
-  // --- 3. CAMBIO DE PARTIDO ---
-  useEffect(() => {
-    if (selectedFixtureId && upcomingFixtures.length > 0) {
-      const fix = upcomingFixtures.find(f => f.id === selectedFixtureId);
-      if (fix) {
-        setHomeTeamId(fix.home_team_id);
-        setAwayTeamId(fix.away_team_id);
-      }
-    }
-  }, [selectedFixtureId, upcomingFixtures]);
+    const upcomingDates = useMemo(() => {
+        return [...new Set(fixtures.map((fixture) => getDateKey(fixture.date)))];
+    }, [fixtures]);
 
-  // --- 4. CARGA DE HISTORIAL PROFUNDO CON TODAS LAS ESTADÍSTICAS ---
-  const fetchFixturesForTeam = async (teamId: number, setFixtures: (data: any) => void) => {
-    const { data } = await supabase
-      .from('fixtures')
-      .select(`
-        id, date, home_goals, away_goals, home_team_id, away_team_id,
-        home_team:teams!fixtures_home_team_id_fkey(id, name),
-        away_team:teams!fixtures_away_team_id_fkey(id, name),
-        fixture_statistics(team_id, corners, yellow_cards, red_cards, total_shots, shots_on_target, fouls)
-      `)
-      .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-      .eq('status', 'FT')
-      .order('date', { ascending: false })
-      .limit(30); 
-      
-    if (data) {
-      const mapped = data.map(f => {
-        const isHome = f.home_team_id === teamId;
-        const opponent = isHome ? (Array.isArray(f.away_team) ? f.away_team[0].name : (f.away_team as any)?.name) : (Array.isArray(f.home_team) ? f.home_team[0].name : (f.home_team as any)?.name);
-        
-        const homeStats = f.fixture_statistics.find((s: any) => s.team_id === f.home_team_id) || {};
-        const awayStats = f.fixture_statistics.find((s: any) => s.team_id === f.away_team_id) || {};
+    const effectiveDate =
+        (selectedDate && upcomingDates.includes(selectedDate) ? selectedDate : '') || upcomingDates[0] || '';
 
-        return {
-          id: f.id,
-          date: new Date(f.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-          opponent: opponent || 'Unknown',
-          homeGoals: f.home_goals || 0,
-          awayGoals: f.away_goals || 0,
-          homeCorners: homeStats.corners || 0,
-          awayCorners: awayStats.corners || 0,
-          homeCards: homeStats.yellow_cards || 0,
-          awayCards: awayStats.yellow_cards || 0,
-          homeRedCards: homeStats.red_cards || 0,
-          awayRedCards: awayStats.red_cards || 0,
-          homeShots: homeStats.total_shots || 0,
-          awayShots: awayStats.total_shots || 0,
-          homeShotsOnTarget: homeStats.shots_on_target || 0,
-          awayShotsOnTarget: awayStats.shots_on_target || 0,
-          homeFouls: homeStats.fouls || 0,
-          awayFouls: awayStats.fouls || 0,
-          isHome
-        };
-      });
-      setFixtures(mapped);
-    }
-  };
+    const fixturesForDate = useMemo(() => {
+        if (!effectiveDate) return [];
+        return fixtures.filter((fixture) => getDateKey(fixture.date) === effectiveDate);
+    }, [effectiveDate, fixtures]);
 
-  useEffect(() => { if (homeTeamId) fetchFixturesForTeam(homeTeamId, setHomeFixtures); }, [homeTeamId]);
-  useEffect(() => { if (awayTeamId) fetchFixturesForTeam(awayTeamId, setAwayFixtures); }, [awayTeamId]);
+    const groupedFixtures = useMemo(() => {
+        return fixturesForDate.reduce<Record<string, UpcomingFixtureRecord[]>>((groups, fixture) => {
+            const leagueName = fixture.league_name ?? t('League');
+            const key = `${fixture.league_id}:${leagueName}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(fixture);
+            return groups;
+        }, {});
+    }, [fixturesForDate, t]);
 
-  // --- FILTRO DE LOCALÍA ---
-  const filteredHomeFixtures = useMemo(() => locationToggle === 'All matches' ? homeFixtures : homeFixtures.filter(m => m.isHome === true), [homeFixtures, locationToggle]);
-  const filteredAwayFixtures = useMemo(() => locationToggle === 'All matches' ? awayFixtures : awayFixtures.filter(m => m.isHome === false), [awayFixtures, locationToggle]);
+    const selectedFixture = useMemo(() => {
+        if (selectedFixtureId == null) return null;
+        return fixturesForDate.find((fixture) => fixture.id === selectedFixtureId) ?? null;
+    }, [fixturesForDate, selectedFixtureId]);
 
-  const homeMetrics = useMemo(() => calculateMetrics(filteredHomeFixtures, homeStatType, homeMarket), [filteredHomeFixtures, homeStatType, homeMarket]);
-  const awayMetrics = useMemo(() => calculateMetrics(filteredAwayFixtures, awayStatType, awayMarket), [filteredAwayFixtures, awayStatType, awayMarket]);
+    const effectiveFixture =
+        selectedFixture ?? (homeTeamId == null && awayTeamId == null ? fixturesForDate[0] ?? null : null);
 
-  const selectedHomeTeamObj = teams.find(t => t.id === homeTeamId);
-  const selectedAwayTeamObj = teams.find(t => t.id === awayTeamId);
-  const homeTeamName = selectedHomeTeamObj ? selectedHomeTeamObj.name : 'Home Team';
-  const awayTeamName = selectedAwayTeamObj ? selectedAwayTeamObj.name : 'Away Team';
+    const effectiveFixtureId = effectiveFixture?.id ?? null;
+    const effectiveHomeTeamId = homeTeamId ?? effectiveFixture?.home_team_id ?? null;
+    const effectiveAwayTeamId = awayTeamId ?? effectiveFixture?.away_team_id ?? null;
+    const effectiveLeagueId = effectiveFixture?.league_id ?? null;
+    const effectiveLeagueName = effectiveFixture?.league_name ?? null;
+    const effectiveSeason = effectiveFixture?.season ?? null;
 
-  const groupedFixtures = useMemo(() => {
-    const groups: { [key: number]: any[] } = {};
-    upcomingFixtures.forEach(f => {
-      if (!groups[f.league_id]) groups[f.league_id] = [];
-      groups[f.league_id].push(f);
-    });
-    return groups;
-  }, [upcomingFixtures]);
+    useEffect(() => {
+        if (requestedFixtureId == null || !Number.isFinite(requestedFixtureId) || requestedFixtureId <= 0) {
+            return;
+        }
 
-  const getLeagueName = (leagueId: number) => {
-    const map: {[key: number]: string} = { 39: 'Premier League', 140: 'La Liga', 78: 'Bundesliga', 135: 'Serie A', 61: 'Ligue 1' };
-    return map[leagueId] || `League ${leagueId}`;
-  };
+        if (appliedQueryFixtureId === requestedFixtureId) {
+            return;
+        }
 
-  const getMarketOptions = (statType: string) => {
-    if (statType === 'Match Result') return <><option>Win</option><option>Draw</option><option>Loss</option></>;
-    if (statType === 'Both Teams To Score') return <><option>Yes</option><option>No</option></>;
-    if (statType.includes('Corners')) return <><option>Over 7.5</option><option>Over 8.5</option><option>Over 9.5</option><option>Over 10.5</option></>;
-    if (statType.includes('Shots') || statType.includes('Fouls')) return <><option>Over 10.5</option><option>Over 15.5</option><option>Over 20.5</option><option>Over 25.5</option></>;
-    if (statType.includes('Booking Points')) return <><option>Over 25</option><option>Over 35</option><option>Over 45</option></>;
-    return <><option>Over 0.5</option><option>Over 1.5</option><option>Over 2.5</option><option>Over 3.5</option></>;
-  };
+        const requestedFixture = fixtures.find((fixture) => fixture.id === requestedFixtureId);
+        if (!requestedFixture) {
+            return;
+        }
 
-  const handleStatTypeChange = (val: string, setStatType: any, setMarket: any) => {
-    setStatType(val);
-    if (val === 'Match Result') setMarket('Win');
-    else if (val === 'Both Teams To Score') setMarket('Yes');
-    else if (val.includes('Corners')) setMarket('Over 8.5');
-    else if (val.includes('Shots') || val.includes('Fouls')) setMarket('Over 20.5');
-    else if (val.includes('Booking Points')) setMarket('Over 35');
-    else setMarket('Over 2.5');
-  };
+        queueMicrotask(() => {
+            setSelectedDate(getDateKey(requestedFixture.date));
+            setSelectedFixtureId(requestedFixture.id);
+            setHomeTeamId(requestedFixture.home_team_id);
+            setAwayTeamId(requestedFixture.away_team_id);
+            setAppliedQueryFixtureId(requestedFixture.id);
+        });
+    }, [appliedQueryFixtureId, fixtures, requestedFixtureId]);
+    const effectiveRefereeId = effectiveFixture?.referee_id ?? null;
+    const effectiveRefereeName = effectiveFixture?.referee_name_raw ?? null;
+    const homeTeam = effectiveFixture?.home_team_view ?? null;
+    const awayTeam = effectiveFixture?.away_team_view ?? null;
+    const needsComparisonData = showRecentMatches || showStatistics || showRefereeStats;
+    const {
+        data: comparisonData,
+        errorMessage: comparisonErrorMessage,
+        isLoading: isComparisonLoading,
+    } = useComparisonData(effectiveFixtureId, scope, needsComparisonData);
+    const homeMatches = useMemo(() => {
+        if (!effectiveHomeTeamId) return [] as HistoricalMatch[];
+        return comparisonData.homeMatches.map((item) => mapFixtureToHistoricalMatch(item, effectiveHomeTeamId, locale));
+    }, [comparisonData.homeMatches, effectiveHomeTeamId, locale]);
+    const awayMatches = useMemo(() => {
+        if (!effectiveAwayTeamId) return [] as HistoricalMatch[];
+        return comparisonData.awayMatches.map((item) => mapFixtureToHistoricalMatch(item, effectiveAwayTeamId, locale));
+    }, [comparisonData.awayMatches, effectiveAwayTeamId, locale]);
+    const headToHeadMatches = useMemo(() => {
+        if (!effectiveHomeTeamId) return [] as HistoricalMatch[];
+        return comparisonData.headToHeadMatches.map((item) => mapFixtureToHistoricalMatch(item, effectiveHomeTeamId, locale));
+    }, [comparisonData.headToHeadMatches, effectiveHomeTeamId, locale]);
+    const homeStatSummary = comparisonData.homeSummary;
+    const awayStatSummary = comparisonData.awaySummary;
+    const homeTrends = comparisonData.homeTrends;
+    const awayTrends = comparisonData.awayTrends;
+    const isHomeLoading = isComparisonLoading;
+    const isAwayLoading = isComparisonLoading;
+    const isHeadToHeadLoading = isComparisonLoading;
+    const isHomeStatSummaryLoading = isComparisonLoading;
+    const isAwayStatSummaryLoading = isComparisonLoading;
+    const isHomeTrendsLoading = isComparisonLoading;
+    const isAwayTrendsLoading = isComparisonLoading;
 
-  const renderTable = (data: any[], statType: string, setStatType: any, market: string, setMarket: any, teamName: string, metrics: any, isHomeColumn: boolean) => {
-    const isHighValue = metrics.hitRate >= 70;
-    const isModerateValue = metrics.hitRate >= 50 && metrics.hitRate < 70;
-    
-    return (
-      <div className="bg-white border border-gray-200 shadow-sm rounded-md overflow-hidden flex flex-col h-full">
-        {/* FILTROS MAESTROS */}
-        <div className={`border-b border-gray-200 px-4 py-3 flex flex-col gap-3 ${isHomeColumn ? 'bg-[#F0F7FF]' : 'bg-[#F0FDF4]'}`}>
-          <div className="flex justify-between items-center">
-            <h3 className={`font-bold text-lg ${isHomeColumn ? 'text-[#1E3A8A]' : 'text-[#064E3B]'}`}>{teamName} matches</h3>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full">
-            <select value={statType} onChange={(e) => handleStatTypeChange(e.target.value, setStatType, setMarket)} className="text-sm font-medium border border-gray-300 rounded px-2.5 py-1.5 bg-white text-gray-700 w-full focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer shadow-sm">
-              <optgroup label="Goals">
-                <option>Match Result</option>
-                <option>Both Teams To Score</option>
-                <option>Total Match Goals</option>
-                <option>Team Goals For</option>
-                <option>Team Goals Against</option>
-              </optgroup>
-              <optgroup label="Corners">
-                <option>Total Match Corners</option>
-                <option>Team Corners For</option>
-                <option>Team Corners Against</option>
-              </optgroup>
-              <optgroup label="Shots & Fouls">
-                <option>Total Match Shots</option>
-                <option>Team Total Shots For</option>
-                <option>Match Shots On Target</option>
-                <option>Match Total Fouls</option>
-              </optgroup>
-              <optgroup label="Cards">
-                <option>Total Booking Points</option>
-                <option>Total Cards</option>
-              </optgroup>
-            </select>
-            <select value={market} onChange={(e) => setMarket(e.target.value)} className="text-sm font-medium border border-gray-300 rounded px-2.5 py-1.5 bg-white text-gray-700 w-full focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer shadow-sm">
-              {getMarketOptions(statType)}
-            </select>
-          </div>
-        </div>
-
-        {/* PANEL DE MÉTRICAS */}
-        <div className={`px-4 py-4 flex items-center justify-between border-b ${metrics.total === 0 ? 'bg-gray-50' : isHighValue ? 'bg-[#10B981]/10' : isModerateValue ? 'bg-yellow-500/10' : 'bg-[#EF4444]/10'}`}>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Hit Rate</span>
-            <span className={`text-3xl font-black ${metrics.total === 0 ? 'text-gray-400' : isHighValue ? 'text-[#10B981]' : isModerateValue ? 'text-yellow-600' : 'text-[#EF4444]'}`}>{metrics.hitRate}%</span>
-            <span className="text-xs font-medium text-gray-600">{metrics.hits} out of {metrics.total} matches</span>
-          </div>
-          <div className="flex gap-6 text-right">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Average</span>
-              <span className="text-xl font-bold text-gray-800">{metrics.avg}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Streak</span>
-              <span className="text-xl font-bold text-gray-800">{metrics.currentStreak} {metrics.currentStreak > 2 && '🔥'}</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* LA CUADRÍCULA DE DATOS (Estilo Adamchoi Exacto) */}
-        <div className="overflow-x-auto flex-1">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="bg-gray-50 text-gray-500 border-b border-gray-200 text-[10px] uppercase tracking-wider">
-              <tr>
-                <th className="px-3 py-2 font-bold w-24">Date</th>
-                <th className="px-3 py-2 font-bold w-12 text-center">Comp</th>
-                <th className="px-3 py-2 font-bold text-right w-1/3">Home Team</th>
-                <th className="px-3 py-2 font-bold text-center w-20">Score</th>
-                <th className="px-3 py-2 font-bold text-left w-1/3">Away Team</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white">
-              {data.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 italic">No historical data available.</td></tr>
-              ) : data.map((match) => {
-                const valueForEvaluation = calculateMatchValue(match, statType);
-                const isHit = evaluateHit(valueForEvaluation, statType, market);
-                const { homeVal, awayVal } = getStatValues(match, statType);
-                
-                // Marcador Dinámico
-                const dynamicScore = (statType === 'Match Result' || statType === 'Both Teams To Score') 
-                  ? `${match.homeGoals} - ${match.awayGoals}` 
-                  : `${homeVal} - ${awayVal}`;
-
-                // El Factor Viciado (Tarjetas) Independiente del filtro
-                const renderCards = (yellows: number, reds: number) => {
-                  return (
-                    <span className="inline-flex gap-0.5 align-middle mx-1">
-                      {reds > 0 && <span className="w-2 h-3 bg-red-600 rounded-sm shadow-sm" title={`${reds} Red Card(s)`}></span>}
-                      {yellows > 0 && <span className="w-2 h-3 bg-yellow-400 rounded-sm shadow-sm" title={`${yellows} Yellow Card(s)`}></span>}
-                    </span>
-                  );
-                };
-
-                return (
-                  <tr key={match.id} className={`border-b-[3px] border-white transition-colors ${
-                    isHit ? 'bg-[#10B981]/20 hover:bg-[#10B981]/30' : 'bg-[#EF4444]/15 hover:bg-[#EF4444]/25'
-                  }`}>
-                    <td className="px-3 py-2 text-gray-600 text-[11px] font-mono">{match.date}</td>
-                    <td className="px-3 py-2 text-gray-400 font-bold text-[10px] uppercase text-center bg-black/5 rounded-sm">PL</td>
-                    
-                    {/* Equipo Local */}
-                    <td className={`px-3 py-2 text-right font-medium text-xs ${match.isHome ? 'text-gray-900 font-black' : 'text-gray-600'}`}>
-                      {match.isHome ? teamName : match.opponent}
-                      {renderCards(match.homeCards, match.homeRedCards)}
-                    </td>
-                    
-                    {/* Marcador Dinámico */}
-                    <td className="px-1 py-2 text-center">
-                      <span className={`inline-flex items-center justify-center min-w-[3rem] px-1 py-1 rounded text-xs font-black shadow-sm border bg-white ${
-                          isHit ? 'text-[#047857] border-[#10B981]/40' : 'text-[#B91C1C] border-[#EF4444]/40'
-                        }`}>
-                        {dynamicScore}
-                      </span>
-                    </td>
-                    
-                    {/* Equipo Visitante */}
-                    <td className={`px-3 py-2 text-left font-medium text-xs ${!match.isHome ? 'text-gray-900 font-black' : 'text-gray-600'}`}>
-                      {renderCards(match.awayCards, match.awayRedCards)}
-                      {!match.isHome ? teamName : match.opponent}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+    const homeForm = useMemo(() => summarizeTeamForm(homeMatches), [homeMatches]);
+    const awayForm = useMemo(() => summarizeTeamForm(awayMatches), [awayMatches]);
+    const activeTabLabel = t(
+        activeTab === 'recent-matches'
+            ? 'Recent Matches'
+            : activeTab === 'statistics'
+              ? 'Statistics'
+              : activeTab === 'player-stats'
+                ? 'Player Stats'
+                : activeTab === 'referee-stats'
+                  ? 'Referee Stats'
+                  : activeTab === 'predictions'
+                    ? 'Predictions'
+                    : 'Odds',
     );
-  };
+    const activeTabDescription = getTabDescription(activeTab, t);
+    const activeTabEyebrow = getSectionEyebrow(activeTab, t);
+    const fixtureDateLabel = effectiveFixture ? formatFixtureDateTime(effectiveFixture.date, locale) : null;
+    const competitionLabel = effectiveLeagueName ?? t('League');
+    const scopeLabel = scope === 'all' ? t('All matches') : t('Home / Away');
+    const homeTeamNameDisplay = homeTeam?.name ?? t('Home team');
+    const awayTeamNameDisplay = awayTeam?.name ?? t('Away team');
+    const homeTeamInitials = homeTeamNameDisplay.slice(0, 2);
+    const awayTeamInitials = awayTeamNameDisplay.slice(0, 2);
 
-  return (
-    <div className="min-h-screen bg-[#F3F4F6] font-sans text-gray-900 pb-12 selection:bg-blue-100">
-      <div className="bg-white border-b border-gray-200 px-4 py-4 md:px-8">
-        <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6">
-          <div className="flex-[2] bg-[#F9FAFB] border border-gray-200 rounded-lg p-4 shadow-sm">
-            <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">Select an Upcoming Fixture</h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative min-w-[200px]">
-                <select value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-sm font-medium text-gray-700 appearance-none focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" disabled={isLoading || upcomingDates.length === 0}>
-                  {isLoading ? <option>Loading dates...</option> : upcomingDates.length === 0 ? <option>No upcoming matches</option> : upcomingDates.map(dateStr => {
-                    const d = new Date(`${dateStr}T12:00:00`);
-                    return <option key={dateStr} value={dateStr}>{d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</option>;
-                  })}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></div>
-              </div>
-              <div className="flex-[2] relative">
-                <select value={selectedFixtureId || ''} onChange={(e) => setSelectedFixtureId(Number(e.target.value))} className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-sm font-medium text-gray-700 appearance-none focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" disabled={isLoading || upcomingFixtures.length === 0}>
-                  {isLoading ? <option>Loading fixtures...</option> : upcomingFixtures.length === 0 ? <option>Select a date with fixtures...</option> : Object.entries(groupedFixtures).map(([leagueIdStr, fixtures]) => {
-                    return (
-                      <optgroup key={leagueIdStr} label={getLeagueName(Number(leagueIdStr))} className="font-bold text-gray-900 bg-gray-50">
-                        {fixtures.map(f => {
-                          const time = new Date(f.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-                          return <option key={f.id} value={f.id} className="font-medium text-gray-700">{time} - {Array.isArray(f.home_team) ? f.home_team[0].name : f.home_team?.name} vs {Array.isArray(f.away_team) ? f.away_team[0].name : f.away_team?.name}</option>;
-                        })}
-                      </optgroup>
-                    );
-                  })}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></div>
-              </div>
+    function handleDateChange(value: string) {
+        const nextFixtures = fixtures.filter((fixture) => getDateKey(fixture.date) === value);
+        const nextFixture = nextFixtures[0] ?? null;
+
+        setSelectedDate(value);
+        setSelectedFixtureId(nextFixture?.id ?? null);
+        setHomeTeamId(nextFixture?.home_team_id ?? null);
+        setAwayTeamId(nextFixture?.away_team_id ?? null);
+    }
+
+    function handleFixtureChange(value: number | null) {
+        const nextFixture = fixturesForDate.find((fixture) => fixture.id === value) ?? null;
+
+        setSelectedFixtureId(value);
+        setHomeTeamId(nextFixture?.home_team_id ?? null);
+        setAwayTeamId(nextFixture?.away_team_id ?? null);
+    }
+
+    function handleMarketGroupChange(value: string) {
+        const nextGroup = getMarketGroup(value);
+        setSelectedMarketGroupId(nextGroup.id);
+        setSelectedMarketKey(nextGroup.lines[0]?.key ?? DEFAULT_MARKET_LINE.key);
+    }
+
+    return (
+        <div className="comparison-page flex min-h-full flex-col overflow-x-hidden px-5 py-5 text-[var(--app-text)] md:px-7 md:py-7">
+            <div className="mx-auto flex w-full max-w-[1640px] flex-col gap-6">
+                <section className="flex flex-col gap-4">
+                    <div className="overflow-hidden rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)]">
+                        {effectiveFixture && homeTeam && awayTeam ? (
+                            <div className="grid gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)] lg:px-6">
+                                <div className="flex min-w-0 items-center gap-4">
+                                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel-muted)]">
+                                            {homeTeam.logo_url ? (
+                                                <Image alt={`${homeTeamNameDisplay} logo`} className="h-10 w-10 object-contain" height={40} src={homeTeam.logo_url} width={40} />
+                                            ) : (
+                                                <span className="text-lg font-semibold text-[var(--app-text-dim)]">{homeTeamInitials}</span>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-lg font-semibold text-[var(--app-text)] md:text-xl">{homeTeamNameDisplay}</p>
+                                            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--app-text-dim)]">{t('Home')}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="shrink-0 text-center">
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--app-text-dim)]">{competitionLabel}</p>
+                                        <p className="mt-1 text-sm font-semibold text-[var(--app-text)]">vs</p>
+                                        <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--app-text-dim)]">{scopeLabel}</p>
+                                    </div>
+
+                                    <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+                                        <div className="min-w-0 text-right">
+                                            <p className="truncate text-lg font-semibold text-[var(--app-text)] md:text-xl">{awayTeamNameDisplay}</p>
+                                            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--app-text-dim)]">{t('Away')}</p>
+                                        </div>
+                                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel-muted)]">
+                                            {awayTeam.logo_url ? (
+                                                <Image alt={`${awayTeamNameDisplay} logo`} className="h-10 w-10 object-contain" height={40} src={awayTeam.logo_url} width={40} />
+                                            ) : (
+                                                <span className="text-lg font-semibold text-[var(--app-text-dim)]">{awayTeamInitials}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-3 rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel-muted)] p-4">
+                                    <div>
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Kickoff')}</p>
+                                        <p className="mt-1 text-sm font-semibold text-[var(--app-text)]">{fixtureDateLabel}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{activeTabEyebrow}</p>
+                                        <p className="mt-1 text-base font-semibold text-[var(--app-text)]">{activeTabLabel}</p>
+                                        <p className="mt-1 text-sm text-[var(--app-text-soft)]">{activeTabDescription}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="px-4 py-5 lg:px-6">
+                                <StatePanel
+                                    description={t('Select a date and fixture to unlock the full comparison.')}
+                                    title={t('No fixture selected yet')}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
+                        <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Choose fixture')}</p>
+                            <p className="mt-1 text-sm text-[var(--app-text-soft)]">{t('Pick the match first. The rest of the page updates automatically.')}</p>
+                            <div className="mt-4">
+                                <ComparisonToolbar
+                                    groupedFixtures={groupedFixtures}
+                                    isFixturesLoading={isFixturesLoading}
+                                    isLoading={isFixturesLoading}
+                                    onDateChange={handleDateChange}
+                                    onFixtureChange={handleFixtureChange}
+                                    selectedDate={effectiveDate}
+                                    selectedFixtureId={effectiveFixtureId}
+                                    upcomingDates={upcomingDates}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Analysis scope')}</p>
+                            <p className="mt-1 text-sm text-[var(--app-text-soft)]">{t('This changes how team history is sampled across the page.')}</p>
+                            <div className="mt-4">
+                                <ScopeToggle onChange={setScope} value={scope} />
+                            </div>
+                        </div>
+                        </div>
+
+                        {fixturesErrorMessage ? (
+                            <div className="rounded-[5px] border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                                {t(fixturesErrorMessage)}
+                            </div>
+                        ) : null}
+
+                        {comparisonErrorMessage && needsComparisonData ? (
+                            <div className="rounded-[5px] border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                                {t(comparisonErrorMessage)}
+                            </div>
+                        ) : null}
+
+                        <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] p-2">
+                        <TabsNav activeTab={activeTab} onChange={setActiveTab} />
+                        <div className="border-t border-[var(--app-border)] px-2 pt-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{activeTabEyebrow}</p>
+                            <p className="mt-1 text-sm text-[var(--app-text-soft)]">{activeTabDescription}</p>
+                        </div>
+                    </div>
+
+                    {effectiveFixture && (showRecentMatches || showStatistics || showPlayerStats || showRefereeStats) ? (
+                        <div className="grid gap-3 md:grid-cols-4">
+                            <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Home recent form')}</p>
+                                <p className="mt-2 text-base font-semibold text-[var(--app-text)]">
+                                    {homeForm.wins}-{homeForm.draws}-{homeForm.losses}
+                                </p>
+                                <p className="mt-1 text-xs text-[var(--app-text-soft)]">{t('Last 10')}</p>
+                            </div>
+                            <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Away recent form')}</p>
+                                <p className="mt-2 text-base font-semibold text-[var(--app-text)]">
+                                    {awayForm.wins}-{awayForm.draws}-{awayForm.losses}
+                                </p>
+                                <p className="mt-1 text-xs text-[var(--app-text-soft)]">{t('Last 10')}</p>
+                            </div>
+                            <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Head-to-head sample')}</p>
+                                <p className="mt-2 text-base font-semibold text-[var(--app-text)]">{headToHeadMatches.length}</p>
+                                <p className="mt-1 text-xs text-[var(--app-text-soft)]">{t('Matches in scope')}</p>
+                            </div>
+                            <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Team scope')}</p>
+                                <p className="mt-2 text-base font-semibold text-[var(--app-text)]">{scopeLabel}</p>
+                                <p className="mt-1 text-xs text-[var(--app-text-soft)]">{t('Applied across this analysis view')}</p>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {showRecentMatches ? (
+                        <div className="flex flex-col gap-4">
+                            <div className="grid gap-4 xl:grid-cols-2">
+                                <TeamPanel
+                                    accent="left"
+                                    emptyMessage={t('No matches found for this home-side view.')}
+                                    isLoading={isHomeLoading}
+                                    marketGroupId={selectedMarketGroupId}
+                                    marketKey={selectedMarketKey}
+                                    matches={homeMatches}
+                                    onMarketGroupChange={handleMarketGroupChange}
+                                    onMarketKeyChange={setSelectedMarketKey}
+                                    teamLogoUrl={homeTeam?.logo_url ?? null}
+                                    teamName={homeTeam?.name ?? t('Select home team')}
+                                />
+
+                                <TeamPanel
+                                    accent="right"
+                                    emptyMessage={t('No matches found for this away-side view.')}
+                                    isLoading={isAwayLoading}
+                                    marketGroupId={selectedMarketGroupId}
+                                    marketKey={selectedMarketKey}
+                                    matches={awayMatches}
+                                    onMarketGroupChange={handleMarketGroupChange}
+                                    onMarketKeyChange={setSelectedMarketKey}
+                                    teamLogoUrl={awayTeam?.logo_url ?? null}
+                                    teamName={awayTeam?.name ?? t('Select away team')}
+                                />
+                            </div>
+
+                            <HeadToHeadPanel
+                                awayTeamName={awayTeam?.name ?? t('Away team')}
+                                data={headToHeadMatches}
+                                emptyMessage={t('No head-to-head matches found for this setup.')}
+                                homeTeamName={homeTeam?.name ?? t('Home team')}
+                                isLoading={isHeadToHeadLoading}
+                                marketGroupId={selectedMarketGroupId}
+                                marketKey={selectedMarketKey}
+                                onMarketGroupChange={handleMarketGroupChange}
+                                onMarketKeyChange={setSelectedMarketKey}
+                                scopeLabel={scope === 'all' ? t('All matches') : t('Home / Away')}
+                            />
+
+                            <StatisticsSummaryPanel
+                                awaySummary={awayStatSummary}
+                                awayTeamName={awayTeam?.name ?? t('Away team')}
+                                homeSummary={homeStatSummary}
+                                homeTeamName={homeTeam?.name ?? t('Home team')}
+                                isLoading={isHomeStatSummaryLoading || isAwayStatSummaryLoading}
+                            />
+
+                            <div className="grid gap-4 xl:grid-cols-2">
+                                <TrendPanel
+                                    accent="left"
+                                    category={trendCategory}
+                                    emptyMessage={t('No home team trends qualified for this scope yet.')}
+                                    isLoading={isHomeTrendsLoading}
+                                    onCategoryChange={setTrendCategory}
+                                    teamLogoUrl={homeTeam?.logo_url ?? null}
+                                    teamName={homeTeam?.name ?? t('Select home team')}
+                                    trends={homeTrends}
+                                />
+
+                                <TrendPanel
+                                    accent="right"
+                                    category={trendCategory}
+                                    emptyMessage={t('No away team trends qualified for this scope yet.')}
+                                    isLoading={isAwayTrendsLoading}
+                                    onCategoryChange={setTrendCategory}
+                                    teamLogoUrl={awayTeam?.logo_url ?? null}
+                                    teamName={awayTeam?.name ?? t('Select away team')}
+                                    trends={awayTrends}
+                                />
+                            </div>
+                        </div>
+                    ) : showStatistics ? (
+                        <div className="flex flex-col gap-4">
+                            <StatisticsMarketPanel
+                                awayTeamName={awayTeam?.name ?? t('Away team')}
+                                awayTrends={awayTrends}
+                                category={statisticsCategory}
+                                homeTeamName={homeTeam?.name ?? t('Home team')}
+                                homeTrends={homeTrends}
+                                isLoading={isHomeTrendsLoading || isAwayTrendsLoading}
+                                onCategoryChange={setStatisticsCategory}
+                                scope={scope}
+                            />
+                        </div>
+                    ) : showPlayerStats ? (
+                        <div className="flex flex-col gap-4">
+                            <PlayerStatsPanel
+                                awayTeamId={effectiveAwayTeamId}
+                                awayTeamName={awayTeam?.name ?? t('Away team')}
+                                homeTeamId={effectiveHomeTeamId}
+                                homeTeamName={homeTeam?.name ?? t('Home team')}
+                                leagueId={effectiveLeagueId}
+                                leagueName={effectiveLeagueName}
+                                scope={scope}
+                                season={effectiveSeason}
+                            />
+                        </div>
+                    ) : showRefereeStats ? (
+                        <div className="flex flex-col gap-4">
+                            <RefereeStatsPanel
+                                awaySummary={awayStatSummary}
+                                awayTeamName={awayTeam?.name ?? t('Away team')}
+                                awayTrends={awayTrends}
+                                homeSummary={homeStatSummary}
+                                homeTeamName={homeTeam?.name ?? t('Home team')}
+                                homeTrends={homeTrends}
+                                isTeamDataLoading={
+                                    isHomeStatSummaryLoading || isAwayStatSummaryLoading || isHomeTrendsLoading || isAwayTrendsLoading
+                                }
+                                leagueId={effectiveLeagueId}
+                                refereeId={effectiveRefereeId}
+                                refereeName={effectiveRefereeName}
+                                scope={scope}
+                                season={effectiveSeason}
+                            />
+                        </div>
+                    ) : (
+                        <div className="p-3">
+                            <StatePanel
+                                description={t('The current production view is focused on recent matches and head-to-head analysis.')}
+                                title={t('This tab is not wired yet')}
+                            />
+                        </div>
+                    )}
+                </section>
             </div>
-          </div>
-          <div className="flex-1 bg-white border border-gray-200 rounded-lg p-4 border-dashed">
-            <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">Manual Override</h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative">
-                <select value={homeTeamId || ''} onChange={(e) => setHomeTeamId(Number(e.target.value))} className="w-full bg-white border border-gray-200 rounded px-3 py-2 text-sm font-medium text-gray-500 appearance-none focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" disabled={isLoading}>{isLoading ? <option>Loading...</option> : teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></div>
-              </div>
-              <div className="flex-1 relative">
-                <select value={awayTeamId || ''} onChange={(e) => setAwayTeamId(Number(e.target.value))} className="w-full bg-white border border-gray-200 rounded px-3 py-2 text-sm font-medium text-gray-500 appearance-none focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" disabled={isLoading}>{isLoading ? <option>Loading...</option> : teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></div>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
-
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-8 overflow-x-auto scrollbar-hide">
-          <div className="flex space-x-2 min-w-max pt-1">
-            {TABS.map((tab) => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === tab ? 'border-[#0052CC] text-[#0052CC]' : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'}`}>{tab}</button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h1 className="text-2xl font-black text-gray-800 tracking-tight flex items-center gap-2">{homeTeamName} <span className="text-gray-400 font-normal mx-1">v</span> {awayTeamName}</h1>
-          <div className="flex bg-gray-200/80 rounded p-1 border border-gray-200 shadow-inner">
-            <button onClick={() => setLocationToggle('All matches')} className={`px-4 py-1.5 text-sm font-bold rounded shadow-sm transition-all ${locationToggle === 'All matches' ? 'bg-[#DC2626] text-white' : 'bg-transparent text-gray-500 hover:text-gray-700'}`}>All matches</button>
-            <button onClick={() => setLocationToggle('Home/Away matches')} className={`px-4 py-1.5 text-sm font-bold rounded transition-all ${locationToggle === 'Home/Away matches' ? 'bg-[#DC2626] text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-gray-700'}`}>Home/Away matches</button>
-          </div>
-        </div>
-
-        {activeTab === 'Recent Matches' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
-            {renderTable(filteredHomeFixtures, homeStatType, setHomeStatType, homeMarket, setHomeMarket, homeTeamName, homeMetrics, true)}
-            {renderTable(filteredAwayFixtures, awayStatType, setAwayStatType, awayMarket, setAwayMarket, awayTeamName, awayMetrics, false)}
-          </div>
-        )}
-        
-        {activeTab !== 'Recent Matches' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-16 text-center shadow-sm">
-            <p className="text-gray-500 font-medium">Content for <span className="text-gray-800 font-bold">{activeTab}</span> will be implemented here.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    );
 }
