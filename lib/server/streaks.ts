@@ -35,7 +35,7 @@ export async function loadStreakRows(days: number, marketKey: string, minimumStr
     return [] as StreakServerRow[];
   }
 
-  const fixtures = await loadUpcomingFixtures(days);
+  const fixtures = await loadUpcomingFixtures(days, 'streaks');
   if (fixtures.length === 0) {
     return [];
   }

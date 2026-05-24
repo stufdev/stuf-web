@@ -7,7 +7,7 @@ import type {
   UpcomingFixtureRecord,
   UpcomingFixtureView,
 } from '@/lib/upcoming-fixtures';
-import { getTargetLeagueIds } from './league-config';
+import { getSupportedLeagueIds, type SupportedLeagueFeature } from './league-config';
 import { getSupabaseAdmin } from './supabase-admin';
 
 export const UPCOMING_STATUSES = ['NS', 'TBD'] as const;
@@ -73,11 +73,11 @@ function mapUpcomingFixtureView(
   };
 }
 
-export async function loadUpcomingFixtures(windowDays: number) {
-  const targetLeagueIds = getTargetLeagueIds();
-  if (targetLeagueIds.length === 0) {
-    return [] as UpcomingFixtureView[];
-  }
+export async function loadUpcomingFixtures(
+  windowDays: number,
+  feature: SupportedLeagueFeature = 'fixtures',
+) {
+  const targetLeagueIds = await getSupportedLeagueIds(feature);
 
   const supabaseAdmin = getSupabaseAdmin();
   const { start, end } = getDateRange(windowDays);

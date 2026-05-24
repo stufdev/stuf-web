@@ -17,7 +17,13 @@ import { StatisticsSummaryPanel } from './_components/statistics-summary-panel';
 import { TabsNav, type ComparisonTabId } from './_components/tabs-nav';
 import { TeamPanel } from './_components/team-panel';
 import { TrendPanel } from './_components/trend-panel';
-import { DEFAULT_MARKET_GROUP, DEFAULT_MARKET_LINE, getMarketGroup } from '../market-catalog';
+import {
+    DEFAULT_MARKET_GROUP,
+    DEFAULT_MARKET_LINE,
+    getMarketGroup,
+    getMarketGroupByKey,
+    getMarketLineByKey,
+} from '../market-catalog';
 import { getCompetitionLabel, getTeamName } from './helpers';
 import type {
     ComparisonScope,
@@ -287,13 +293,23 @@ export default function ComparisonPage() {
             return;
         }
 
-        const nextRequestedFixtureId = Number(new URLSearchParams(window.location.search).get('fixture') ?? '');
-        if (!Number.isFinite(nextRequestedFixtureId) || nextRequestedFixtureId <= 0) {
+        const urlSearchParams = new URLSearchParams(window.location.search);
+        const requestedMarketKey = urlSearchParams.get('marketKey');
+        const requestedMarketLine = requestedMarketKey ? getMarketLineByKey(requestedMarketKey) : null;
+        const nextRequestedFixtureId = Number(urlSearchParams.get('fixtureId') ?? urlSearchParams.get('fixture') ?? '');
+        if ((!Number.isFinite(nextRequestedFixtureId) || nextRequestedFixtureId <= 0) && !requestedMarketLine) {
             return;
         }
 
         queueMicrotask(() => {
-            setRequestedFixtureId(nextRequestedFixtureId);
+            if (Number.isFinite(nextRequestedFixtureId) && nextRequestedFixtureId > 0) {
+                setRequestedFixtureId(nextRequestedFixtureId);
+            }
+
+            if (requestedMarketLine) {
+                setSelectedMarketGroupId(getMarketGroupByKey(requestedMarketLine.key).id);
+                setSelectedMarketKey(requestedMarketLine.key);
+            }
         });
     }, []);
 

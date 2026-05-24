@@ -1,49 +1,45 @@
 import 'server-only';
 
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
+import { getSupabaseAdmin } from './supabase-admin';
 
-const TARGET_LEAGUES_CONFIG_PATH = path.resolve(process.cwd(), '..', 'config', 'target-leagues.json');
+export type SupportedLeagueFeature = 'comparison' | 'fixtures' | 'streaks';
 
-let cachedDefaultTargetLeagues: number[] | null = null;
+type SupportedLeagueRow = {
+  league_id: number | string | null;
+};
 
-function loadDefaultTargetLeagues() {
-  if (cachedDefaultTargetLeagues) {
-    return [...cachedDefaultTargetLeagues];
+const FEATURE_COLUMNS: Record<
+  SupportedLeagueFeature,
+  'enabled_for_comparison' | 'enabled_for_fixtures' | 'enabled_for_streaks'
+> = {
+  comparison: 'enabled_for_comparison',
+  fixtures: 'enabled_for_fixtures',
+  streaks: 'enabled_for_streaks',
+};
+
+export async function getSupportedLeagueIds(feature: SupportedLeagueFeature) {
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data, error } = await supabaseAdmin
+    .from('supported_leagues')
+    .select('league_id')
+    .eq('is_active', true)
+    .eq(FEATURE_COLUMNS[feature], true)
+    .order('display_order', { ascending: true })
+    .order('league_id', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to load supported leagues for ${feature}: ${error.message}`);
   }
 
-  const rawConfig = readFileSync(TARGET_LEAGUES_CONFIG_PATH, 'utf-8');
-  const parsedConfig = JSON.parse(rawConfig) as { default_target_leagues?: unknown };
-  const rawLeagues = parsedConfig.default_target_leagues;
+  const leagueIds = [...new Set(
+    ((data ?? []) as SupportedLeagueRow[])
+      .map((row) => Number(row.league_id))
+      .filter((value) => Number.isInteger(value) && value > 0),
+  )];
 
-  if (!Array.isArray(rawLeagues)) {
-    throw new Error(
-      `Invalid target league config at ${TARGET_LEAGUES_CONFIG_PATH}. Expected a 'default_target_leagues' array.`,
-    );
+  if (leagueIds.length === 0) {
+    throw new Error('No supported leagues configured.');
   }
 
-  const leagues = rawLeagues
-    .map((value) => Number(value))
-    .filter((value, index, values) => Number.isInteger(value) && value > 0 && values.indexOf(value) === index);
-
-  if (leagues.length === 0) {
-    throw new Error(`Target league config at ${TARGET_LEAGUES_CONFIG_PATH} does not contain any valid league ids.`);
-  }
-
-  cachedDefaultTargetLeagues = leagues;
-  return [...leagues];
-}
-
-export function getTargetLeagueIds() {
-  const rawValue = process.env.TARGET_LEAGUES;
-  if (!rawValue) {
-    return loadDefaultTargetLeagues();
-  }
-
-  const parsed = rawValue
-    .split(',')
-    .map((value) => Number(value.trim()))
-    .filter((value) => Number.isInteger(value) && value > 0);
-
-  return parsed.length > 0 ? parsed : loadDefaultTargetLeagues();
+  return leagueIds;
 }

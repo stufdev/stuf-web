@@ -35,6 +35,24 @@ export default function RootLayout({
                 <Link className="underline" href="/streaks">
                   Streaks
                 </Link>
+                <Link className="underline" href="/corners">
+                  Corners
+                </Link>
+                <Link className="underline" href="/corners/quick">
+                  Corners Quick
+                </Link>
+                <Link className="underline" href="/shots/detailed">
+                  Shots
+                </Link>
+                <Link className="underline" href="/shots/quick">
+                  Shots Quick
+                </Link>
+                <Link className="underline" href="/goals/overs">
+                  Goals
+                </Link>
+                <Link className="underline" href="/goals/overs/quick">
+                  Goals Quick
+                </Link>
               </nav>
             </div>
             {children}

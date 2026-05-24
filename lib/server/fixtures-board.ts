@@ -202,7 +202,7 @@ export async function loadFixturesBoard(
     return [] as FixtureBoardEntry[];
   }
 
-  const fixtures = await loadUpcomingFixtures(days);
+  const fixtures = await loadUpcomingFixtures(days, 'fixtures');
   if (fixtures.length === 0) {
     return [];
   }
