@@ -12,6 +12,18 @@ import {
   type ShotDetailTiming,
 } from '@/lib/server/shot-market-scanner';
 import {
+  loadOffsideFilterOptions,
+  loadOffsideTeamPanelsWithTiming,
+  parseOffsideFilters,
+  type OffsideDetailTiming,
+} from '@/lib/server/offside-market-scanner';
+import {
+  loadCardFilterOptions,
+  loadCardTeamPanelsWithTiming,
+  parseCardFilters,
+  type CardDetailTiming,
+} from '@/lib/server/card-market-scanner';
+import {
   loadGoalFilterOptions,
   loadGoalTeamPanelsWithTiming,
   normalizeGoalFamily,
@@ -23,7 +35,7 @@ import {
 export const revalidate = 30;
 
 type MarketSearchParams = Record<string, string | string[] | undefined>;
-type MarketDetailTiming = (CornerDetailTiming | ShotDetailTiming | GoalDetailTiming) & {
+type MarketDetailTiming = (CornerDetailTiming | ShotDetailTiming | GoalDetailTiming | OffsideDetailTiming | CardDetailTiming) & {
   serializationMs: number;
   totalRouteMs: number;
   payloadBytes: number;
@@ -56,7 +68,7 @@ function serverTiming(timing: MarketDetailTiming) {
 
 export async function GET(request: NextRequest) {
   const category = request.nextUrl.searchParams.get('category') ?? 'corners';
-  if (category !== 'corners' && category !== 'shots' && category !== 'goals') {
+  if (category !== 'corners' && category !== 'shots' && category !== 'goals' && category !== 'offsides' && category !== 'cards') {
     return NextResponse.json({ error: `Unsupported team market profile category: ${category}` }, { status: 400 });
   }
 
@@ -78,7 +90,21 @@ export async function GET(request: NextRequest) {
           const { result, timing } = await loadShotTeamPanelsWithTiming(filters, { includeEvidence: false });
           return { filters, result, timing };
         })()
-        : await (async () => {
+        : category === 'offsides'
+          ? await (async () => {
+            const options = await loadOffsideFilterOptions();
+            const filters = parseOffsideFilters(searchParamRecord, options);
+            const { result, timing } = await loadOffsideTeamPanelsWithTiming(filters, { includeEvidence: false });
+            return { filters, result, timing };
+          })()
+          : category === 'cards'
+            ? await (async () => {
+              const options = await loadCardFilterOptions();
+              const filters = parseCardFilters(searchParamRecord, options);
+              const { result, timing } = await loadCardTeamPanelsWithTiming(filters, { includeEvidence: false });
+              return { filters, result, timing };
+            })()
+            : await (async () => {
           const family = statisticFromGoalMarketKey(firstParam(searchParamRecord.marketKey) ?? '')?.family
             ?? normalizeGoalFamily(searchParamRecord.family);
           const options = await loadGoalFilterOptions(family);

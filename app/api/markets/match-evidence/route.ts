@@ -12,6 +12,18 @@ import {
   type ShotDetailTiming,
 } from '@/lib/server/shot-market-scanner';
 import {
+  loadOffsideFilterOptions,
+  loadOffsideMatchEvidence,
+  parseOffsideFilters,
+  type OffsideDetailTiming,
+} from '@/lib/server/offside-market-scanner';
+import {
+  loadCardFilterOptions,
+  loadCardMatchEvidence,
+  parseCardFilters,
+  type CardDetailTiming,
+} from '@/lib/server/card-market-scanner';
+import {
   loadGoalFilterOptions,
   loadGoalMatchEvidence,
   normalizeGoalFamily,
@@ -23,7 +35,7 @@ import {
 export const revalidate = 30;
 
 type MarketSearchParams = Record<string, string | string[] | undefined>;
-type MarketDetailTiming = (CornerDetailTiming | ShotDetailTiming | GoalDetailTiming) & {
+type MarketDetailTiming = (CornerDetailTiming | ShotDetailTiming | GoalDetailTiming | OffsideDetailTiming | CardDetailTiming) & {
   serializationMs: number;
   totalRouteMs: number;
   payloadBytes: number;
@@ -67,7 +79,7 @@ function serverTiming(timing: MarketDetailTiming) {
 
 export async function GET(request: NextRequest) {
   const category = request.nextUrl.searchParams.get('category') ?? 'corners';
-  if (category !== 'corners' && category !== 'shots' && category !== 'goals') {
+  if (category !== 'corners' && category !== 'shots' && category !== 'goals' && category !== 'offsides' && category !== 'cards') {
     return NextResponse.json({ error: `Unsupported match evidence category: ${category}` }, { status: 400 });
   }
 
@@ -98,7 +110,29 @@ export async function GET(request: NextRequest) {
           const { result, timing } = await loadShotMatchEvidence(filters, selectedTeamIds);
           return { filters, result, timing };
         })()
-        : await (async () => {
+        : category === 'offsides'
+          ? await (async () => {
+            const options = await loadOffsideFilterOptions();
+            const filters = parseOffsideFilters(searchParamRecord, options);
+            const selectedTeamIds = teamIds.length > 0 ? teamIds : filters.teamId === null ? [] : [filters.teamId];
+            if (selectedTeamIds.length === 0) {
+              throw new Error('teamIds is required for match evidence requests.');
+            }
+            const { result, timing } = await loadOffsideMatchEvidence(filters, selectedTeamIds);
+            return { filters, result, timing };
+          })()
+          : category === 'cards'
+            ? await (async () => {
+              const options = await loadCardFilterOptions();
+              const filters = parseCardFilters(searchParamRecord, options);
+              const selectedTeamIds = teamIds.length > 0 ? teamIds : filters.teamId === null ? [] : [filters.teamId];
+              if (selectedTeamIds.length === 0) {
+                throw new Error('teamIds is required for match evidence requests.');
+              }
+              const { result, timing } = await loadCardMatchEvidence(filters, selectedTeamIds);
+              return { filters, result, timing };
+            })()
+            : await (async () => {
           const family = statisticFromGoalMarketKey(firstParam(searchParamRecord.marketKey) ?? '')?.family
             ?? normalizeGoalFamily(searchParamRecord.family);
           const options = await loadGoalFilterOptions(family);

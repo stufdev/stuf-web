@@ -290,7 +290,7 @@ export function calculateMatchValue(match: HistoricalMatch, statType: string) {
   if (statType.includes('CARDS')) {
     if (statType.startsWith('MATCH_')) return values.totalCards;
     if (statType.includes('_CARDS_FOR')) return values.teamCards;
-    if (statType.includes('OPPONENT_OVER_')) return values.opponentCards;
+    if (statType.includes('_CARDS_AGAINST')) return values.opponentCards;
     if (statType.startsWith('EACH_TEAM_')) return Math.min(values.teamCards, values.opponentCards);
   }
 

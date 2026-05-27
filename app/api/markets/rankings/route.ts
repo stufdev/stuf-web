@@ -10,6 +10,16 @@ import {
   parseShotQuickFilters,
 } from '@/lib/server/shot-market-scanner';
 import {
+  loadOffsideFilterOptions,
+  loadOffsideQuickScannerWithTiming,
+  parseOffsideQuickFilters,
+} from '@/lib/server/offside-market-scanner';
+import {
+  loadCardFilterOptions,
+  loadCardQuickScannerWithTiming,
+  parseCardQuickFilters,
+} from '@/lib/server/card-market-scanner';
+import {
   loadGoalFilterOptions,
   loadGoalQuickScannerWithTiming,
   normalizeGoalFamily,
@@ -37,7 +47,7 @@ function firstParam(value: string | string[] | undefined) {
 export async function GET(request: NextRequest) {
   const routeStartedAt = Date.now();
   const category = request.nextUrl.searchParams.get('category') ?? 'corners';
-  if (category !== 'corners' && category !== 'shots' && category !== 'goals') {
+  if (category !== 'corners' && category !== 'shots' && category !== 'goals' && category !== 'offsides' && category !== 'cards') {
     return NextResponse.json({ error: `Unsupported market ranking category: ${category}` }, { status: 400 });
   }
 
@@ -57,7 +67,21 @@ export async function GET(request: NextRequest) {
           const { result, timing } = await loadShotQuickScannerWithTiming(filters);
           return { filters, result, timing };
         })()
-        : await (async () => {
+        : category === 'offsides'
+          ? await (async () => {
+            const options = await loadOffsideFilterOptions();
+            const filters = parseOffsideQuickFilters(searchParamRecord, options);
+            const { result, timing } = await loadOffsideQuickScannerWithTiming(filters);
+            return { filters, result, timing };
+          })()
+          : category === 'cards'
+            ? await (async () => {
+              const options = await loadCardFilterOptions();
+              const filters = parseCardQuickFilters(searchParamRecord, options);
+              const { result, timing } = await loadCardQuickScannerWithTiming(filters);
+              return { filters, result, timing };
+            })()
+            : await (async () => {
           const family = statisticFromGoalMarketKey(firstParam(searchParamRecord.marketKey) ?? '')?.family
             ?? normalizeGoalFamily(searchParamRecord.family);
           const options = await loadGoalFilterOptions(family);

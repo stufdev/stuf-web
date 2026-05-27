@@ -9,6 +9,33 @@ export const metadata: Metadata = {
   description: "Professional football analytics workspace",
 };
 
+function NavMenu({
+  items,
+  label,
+}: {
+  items: Array<{ href: string; label: string }>;
+  label: string;
+}) {
+  return (
+    <div className="group relative">
+      <button className="underline" type="button">
+        {label}
+      </button>
+      <div className="invisible absolute left-0 top-full z-50 min-w-48 border border-[var(--app-border)] bg-[var(--app-panel)] p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
+        {items.map((item) => (
+          <Link
+            className="block rounded px-3 py-2 text-sm text-[var(--app-text)] hover:bg-[var(--app-panel-muted)]"
+            href={item.href}
+            key={item.href}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,24 +62,46 @@ export default function RootLayout({
                 <Link className="underline" href="/streaks">
                   Streaks
                 </Link>
-                <Link className="underline" href="/corners">
-                  Corners
-                </Link>
-                <Link className="underline" href="/corners/quick">
-                  Corners Quick
-                </Link>
-                <Link className="underline" href="/shots/detailed">
-                  Shots
-                </Link>
-                <Link className="underline" href="/shots/quick">
-                  Shots Quick
-                </Link>
-                <Link className="underline" href="/goals/overs">
-                  Goals
-                </Link>
-                <Link className="underline" href="/goals/overs/quick">
-                  Goals Quick
-                </Link>
+                <NavMenu
+                  label="Corners"
+                  items={[
+                    { href: "/corners", label: "Detailed" },
+                    { href: "/corners/quick", label: "Quick Search" },
+                  ]}
+                />
+                <NavMenu
+                  label="Shots"
+                  items={[
+                    { href: "/shots/detailed", label: "Detailed" },
+                    { href: "/shots/quick", label: "Quick Search" },
+                  ]}
+                />
+                <NavMenu
+                  label="Goals"
+                  items={[
+                    { href: "/goals", label: "Goals Home" },
+                    { href: "/goals/overs", label: "Overs Detailed" },
+                    { href: "/goals/overs/quick", label: "Overs Quick" },
+                    { href: "/goals/team-goals", label: "Team Goals Detailed" },
+                    { href: "/goals/team-goals/quick", label: "Team Goals Quick" },
+                    { href: "/goals/by-half", label: "By Half Detailed" },
+                    { href: "/goals/by-half/quick", label: "By Half Quick" },
+                  ]}
+                />
+                <NavMenu
+                  label="Offsides"
+                  items={[
+                    { href: "/offsides", label: "Detailed" },
+                    { href: "/offsides/quick", label: "Quick Search" },
+                  ]}
+                />
+                <NavMenu
+                  label="Cards"
+                  items={[
+                    { href: "/cards", label: "Detailed" },
+                    { href: "/cards/quick", label: "Quick Search" },
+                  ]}
+                />
               </nav>
             </div>
             {children}
