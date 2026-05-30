@@ -42,6 +42,14 @@ export const APP_SECTIONS: AppSection[] = [
     description: 'Model signals and confidence scores will land here once this block is ready.',
   },
   {
+    id: 'player-props',
+    href: '/player-props',
+    label: 'Player Props',
+    shortLabel: 'PRP',
+    status: 'Live',
+    description: 'Historical hit rates for player props across upcoming V1 fixtures.',
+  },
+  {
     id: 'players',
     label: 'Player DB',
     shortLabel: 'PLY',

@@ -102,6 +102,9 @@ export default function RootLayout({
                     { href: "/cards/quick", label: "Quick Search" },
                   ]}
                 />
+                <Link className="underline" href="/player-props">
+                  Player Props
+                </Link>
               </nav>
             </div>
             {children}

@@ -6,8 +6,6 @@ import { getMarketGroup, MARKET_GROUPS } from '../../market-catalog';
 import { RedCardSlot } from './red-card-slot';
 import { SelectField } from '../../components/select-field';
 import {
-  calculateMatchValue,
-  evaluateHit,
   getCenterColumnLabel,
   getMatchDisplayValue,
   getMatchRowClass,
@@ -37,11 +35,9 @@ function MatchTableRow({
   match: HistoricalMatch;
   marketKey: string;
 }) {
-  const value = calculateMatchValue(match, marketKey);
-  const isHit = evaluateHit(value, marketKey);
   const goalsDisplay = getMatchDisplayValue(match, marketKey);
-  const valueClass = getMatchValueClass(isHit);
-  const rowClass = getMatchRowClass(isHit);
+  const valueClass = getMatchValueClass(match.hit);
+  const rowClass = getMatchRowClass(match.hit);
 
   return (
     <tr className={`border-b border-[var(--app-border)] bg-[var(--app-panel)] last:border-b-0 ${rowClass}`}>

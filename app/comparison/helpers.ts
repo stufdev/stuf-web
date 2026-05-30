@@ -2,7 +2,6 @@ import { translateUiText, type AppLanguage } from '../i18n';
 import { getMarketGroupByKey, getMarketLabelByKey } from '../market-catalog';
 import type {
   HistoricalMatch,
-  Metrics,
   NameRelation,
   PlayerGoalSplitId,
   PlayerStatsCategoryId,
@@ -81,6 +80,8 @@ export type StatisticsMarketRow = {
   away: TeamMarketTrendRecord | null;
 };
 
+const MISSING_PLACEHOLDER = '—';
+
 export function getRelationName(relation: NameRelation | NameRelation[] | null | undefined) {
   if (!relation) return null;
   return Array.isArray(relation) ? relation[0]?.name ?? null : relation.name;
@@ -137,242 +138,59 @@ export function getCenterColumnLabel(statType: string, language: AppLanguage = '
   return translateUiText(language, label);
 }
 
-function parseMarketLineValue(marketKey: string) {
-  const match = marketKey.match(/(?:OVER|UNDER)_([0-9]+)(?:_([0-9]+))?/);
-  if (!match) return null;
-  const whole = match[1];
-  const decimal = match[2];
-  return decimal ? Number(`${whole}.${decimal}`) : Number(whole);
-}
-
-function getPerspectiveValues(match: HistoricalMatch) {
-  const teamGoals = match.isHome ? match.homeGoals : match.awayGoals;
-  const opponentGoals = match.isHome ? match.awayGoals : match.homeGoals;
-  const teamGoals1H = match.isHome ? match.homeGoals1H : match.awayGoals1H;
-  const opponentGoals1H = match.isHome ? match.awayGoals1H : match.homeGoals1H;
-  const teamGoals2H = match.isHome ? match.homeGoals2H : match.awayGoals2H;
-  const opponentGoals2H = match.isHome ? match.awayGoals2H : match.homeGoals2H;
-  const teamCorners = match.isHome ? match.homeCorners : match.awayCorners;
-  const opponentCorners = match.isHome ? match.awayCorners : match.homeCorners;
-  const teamCards = match.isHome ? match.homeCards : match.awayCards;
-  const opponentCards = match.isHome ? match.awayCards : match.homeCards;
-  const teamBookingPoints = match.isHome ? match.homeBookingPoints : match.awayBookingPoints;
-  const opponentBookingPoints = match.isHome ? match.awayBookingPoints : match.homeBookingPoints;
-  const teamShots = match.isHome ? match.homeShots : match.awayShots;
-  const opponentShots = match.isHome ? match.awayShots : match.homeShots;
-  const teamShotsOnTarget = match.isHome ? match.homeShotsOnTarget : match.awayShotsOnTarget;
-  const teamFouls = match.isHome ? match.homeFouls : match.awayFouls;
-  const opponentFouls = match.isHome ? match.awayFouls : match.homeFouls;
-  const teamOffsides = match.isHome ? match.homeOffsides : match.awayOffsides;
-  const opponentOffsides = match.isHome ? match.awayOffsides : match.homeOffsides;
-
-  return {
-    teamGoals,
-    opponentGoals,
-    totalGoals: match.homeGoals + match.awayGoals,
-    teamGoals1H,
-    opponentGoals1H,
-    totalGoals1H: match.homeGoals1H + match.awayGoals1H,
-    teamGoals2H,
-    opponentGoals2H,
-    totalGoals2H: match.homeGoals2H + match.awayGoals2H,
-    teamCorners,
-    opponentCorners,
-    totalCorners: match.homeCorners + match.awayCorners,
-    teamCards,
-    opponentCards,
-    totalCards: match.homeCards + match.awayCards,
-    teamBookingPoints,
-    opponentBookingPoints,
-    totalBookingPoints: match.homeBookingPoints + match.awayBookingPoints,
-    teamShots,
-    opponentShots,
-    teamShotsOnTarget,
-    totalFouls: match.homeFouls + match.awayFouls,
-    teamFouls,
-    opponentFouls,
-    totalOffsides: match.homeOffsides + match.awayOffsides,
-    teamOffsides,
-    opponentOffsides,
-  };
+function formatPair(home: number | null, away: number | null) {
+  if (home == null || away == null) return MISSING_PLACEHOLDER;
+  return `${home}-${away}`;
 }
 
 export function getMatchDisplayValue(match: HistoricalMatch, statType: string) {
-  if (['WIN', 'DRAW', 'LOSS', 'UNBEATEN', 'WINLESS', 'BTTS_YES'].includes(statType)) {
-    return `${match.homeGoals}-${match.awayGoals}`;
-  }
-
   if (statType.includes('_1H_')) {
-    return `${match.homeGoals1H}-${match.awayGoals1H}`;
+    return formatPair(match.homeGoals1H, match.awayGoals1H);
   }
 
   if (statType.includes('_2H_')) {
-    return `${match.homeGoals2H}-${match.awayGoals2H}`;
+    return formatPair(match.homeGoals2H, match.awayGoals2H);
   }
 
   if (statType.includes('CORNERS')) {
-    return `${match.homeCorners}-${match.awayCorners}`;
+    return formatPair(match.homeCorners, match.awayCorners);
   }
 
   if (statType.includes('BOOKING_POINTS')) {
-    return `${match.homeBookingPoints}-${match.awayBookingPoints}`;
+    return formatPair(match.homeBookingPoints, match.awayBookingPoints);
   }
 
   if (statType.includes('CARDS')) {
-    return `${match.homeCards}-${match.awayCards}`;
+    return formatPair(match.homeCards, match.awayCards);
   }
 
   if (statType.includes('SHOTS_ON_TARGET')) {
-    return `${match.homeShotsOnTarget}-${match.awayShotsOnTarget}`;
+    return formatPair(match.homeShotsOnTarget, match.awayShotsOnTarget);
   }
 
   if (statType.includes('SHOTS')) {
-    return `${match.homeShots}-${match.awayShots}`;
+    return formatPair(match.homeShots, match.awayShots);
   }
 
   if (statType.includes('FOULS')) {
-    return `${match.homeFouls}-${match.awayFouls}`;
+    return formatPair(match.homeFouls, match.awayFouls);
   }
 
   if (statType.includes('OFFSIDES')) {
-    return `${match.homeOffsides}-${match.awayOffsides}`;
+    return formatPair(match.homeOffsides, match.awayOffsides);
   }
 
-  return `${match.homeGoals}-${match.awayGoals}`;
+  return formatPair(match.homeGoals, match.awayGoals);
 }
 
-export function calculateMatchValue(match: HistoricalMatch, statType: string) {
-  const values = getPerspectiveValues(match);
-
-  if (['WIN', 'DRAW', 'LOSS', 'UNBEATEN', 'WINLESS'].includes(statType)) {
-    return values.teamGoals - values.opponentGoals;
-  }
-
-  if (statType === 'BTTS_YES') {
-    return match.homeGoals > 0 && match.awayGoals > 0 ? 1 : 0;
-  }
-
-  if (statType === 'MOST_CORNERS') {
-    return values.teamCorners - values.opponentCorners;
-  }
-
-  if (statType.includes('_1H_')) {
-    if (statType.startsWith('MATCH_')) return values.totalGoals1H;
-    if (statType.includes('_GOALS_FOR')) return values.teamGoals1H;
-    if (statType.includes('_GOALS_AGAINST')) return values.opponentGoals1H;
-  }
-
-  if (statType.includes('_2H_')) {
-    if (statType.startsWith('MATCH_')) return values.totalGoals2H;
-    if (statType.includes('_GOALS_FOR')) return values.teamGoals2H;
-    if (statType.includes('_GOALS_AGAINST')) return values.opponentGoals2H;
-  }
-
-  if (statType.includes('GOALS')) {
-    if (statType.startsWith('MATCH_')) return values.totalGoals;
-    if (statType.includes('_GOALS_FOR')) return values.teamGoals;
-    if (statType.includes('_GOALS_AGAINST')) return values.opponentGoals;
-  }
-
-  if (statType.includes('CORNERS')) {
-    if (statType.startsWith('MATCH_')) return values.totalCorners;
-    if (statType.includes('_CORNERS_FOR')) return values.teamCorners;
-    if (statType.includes('_CORNERS_AGAINST')) return values.opponentCorners;
-  }
-
-  if (statType.includes('BOOKING_POINTS')) {
-    if (statType.startsWith('MATCH_')) return values.totalBookingPoints;
-    if (statType.includes('_BOOKING_POINTS_FOR')) return values.teamBookingPoints;
-    if (statType.includes('_BOOKING_POINTS_AGAINST')) return values.opponentBookingPoints;
-    if (statType.startsWith('EACH_TEAM_')) return Math.min(values.teamBookingPoints, values.opponentBookingPoints);
-  }
-
-  if (statType.includes('CARDS')) {
-    if (statType.startsWith('MATCH_')) return values.totalCards;
-    if (statType.includes('_CARDS_FOR')) return values.teamCards;
-    if (statType.includes('_CARDS_AGAINST')) return values.opponentCards;
-    if (statType.startsWith('EACH_TEAM_')) return Math.min(values.teamCards, values.opponentCards);
-  }
-
-  if (statType.includes('SHOTS_ON_TARGET')) {
-    return values.teamShotsOnTarget;
-  }
-
-  if (statType.includes('SHOTS')) {
-    return values.teamShots;
-  }
-
-  if (statType.includes('FOULS')) {
-    if (statType.startsWith('MATCH_')) return values.totalFouls;
-    return values.teamFouls;
-  }
-
-  if (statType.includes('OFFSIDES')) {
-    if (statType.startsWith('MATCH_')) return values.totalOffsides;
-    return values.teamOffsides;
-  }
-
-  return 0;
+export function getMatchRowClass(hit: boolean | null) {
+  return hit === true ? 'bg-emerald-500/10' : '';
 }
 
-export function evaluateHit(value: number, statType: string) {
-  if (statType === 'WIN') return value > 0;
-  if (statType === 'DRAW') return value === 0;
-  if (statType === 'LOSS') return value < 0;
-  if (statType === 'UNBEATEN') return value >= 0;
-  if (statType === 'WINLESS') return value <= 0;
-  if (statType === 'MOST_CORNERS') return value > 0;
-  if (statType === 'BTTS_YES') return value === 1;
-
-  const line = parseMarketLineValue(statType);
-  if (line === null) return false;
-  if (statType.includes('_UNDER_')) return value < line;
-  if (statType.includes('_OVER_')) return value > line;
-  return false;
-}
-
-export function getMatchRowClass(isHit: boolean) {
-  return isHit
-    ? 'bg-emerald-500/10'
-    : '';
-}
-
-export function getMatchValueClass(isHit: boolean) {
-  return isHit ? 'text-[#d7ffe6]' : 'text-[var(--app-text)]';
-}
-
-export function calculateMetrics(matches: HistoricalMatch[], statType: string): Metrics {
-  if (!matches.length) {
-    return { hitRate: 0, hits: 0, total: 0, avg: '-', currentStreak: 0 };
-  }
-
-  const total = matches.length;
-  let hits = 0;
-  let sumValues = 0;
-  let currentStreak = 0;
-  let streakBroken = false;
-
-  matches.forEach((match) => {
-    const value = calculateMatchValue(match, statType);
-    const isHit = evaluateHit(value, statType);
-
-    if (isHit) hits += 1;
-    if (statType !== 'Match Result' && statType !== 'Both Teams To Score') sumValues += value;
-
-    if (isHit && !streakBroken) currentStreak += 1;
-    else streakBroken = true;
-  });
-
-  return {
-    hitRate: Math.round((hits / total) * 100),
-    hits,
-    total,
-    avg:
-      statType === 'Match Result' || statType === 'Both Teams To Score'
-        ? '-'
-        : (sumValues / total).toFixed(1),
-    currentStreak,
-  };
+export function getMatchValueClass(hit: boolean | null) {
+  if (hit === true) return 'text-[#d7ffe6]';
+  if (hit === false) return 'text-[var(--app-text)]';
+  return 'text-[var(--app-text-dim)]';
 }
 
 export function getTrendScopeLabel(scope: 'overall' | 'home' | 'away', language: AppLanguage = 'en') {

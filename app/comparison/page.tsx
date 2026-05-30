@@ -24,11 +24,9 @@ import {
     getMarketGroupByKey,
     getMarketLineByKey,
 } from '../market-catalog';
-import { getCompetitionLabel, getTeamName } from './helpers';
 import type {
     ComparisonScope,
     ComparisonCoreResponse,
-    HistoricalFixtureRecord,
     HistoricalMatch,
     StatisticsCategoryId,
     TrendCategoryId,
@@ -46,16 +44,6 @@ const EMPTY_COMPARISON_DATA: ComparisonCoreResponse = {
     homeTrends: [],
 };
 
-function formatShortDate(isoDate: string, locale: string) {
-    return new Intl.DateTimeFormat(locale, {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    })
-        .format(new Date(isoDate))
-        .replace(',', '');
-}
-
 function formatFixtureDateTime(isoDate: string, locale: string) {
     return new Intl.DateTimeFormat(locale, {
         weekday: 'long',
@@ -66,83 +54,12 @@ function formatFixtureDateTime(isoDate: string, locale: string) {
     }).format(new Date(isoDate));
 }
 
-function mapFixtureToHistoricalMatch(record: HistoricalFixtureRecord, teamId: number, locale: string): HistoricalMatch {
-    const homeStats = record.fixture_statistics.find(
-        (item) => item.team_id === record.home_team_id && item.period === 'FT',
-    );
-    const awayStats = record.fixture_statistics.find(
-        (item) => item.team_id === record.away_team_id && item.period === 'FT',
-    );
-    const homeStats1H = record.fixture_statistics.find(
-        (item) => item.team_id === record.home_team_id && item.period === '1H',
-    );
-    const awayStats1H = record.fixture_statistics.find(
-        (item) => item.team_id === record.away_team_id && item.period === '1H',
-    );
-    const homeStats2H = record.fixture_statistics.find(
-        (item) => item.team_id === record.home_team_id && item.period === '2H',
-    );
-    const awayStats2H = record.fixture_statistics.find(
-        (item) => item.team_id === record.away_team_id && item.period === '2H',
-    );
-
-    const homeTeamName = getTeamName(record.home_team) ?? 'Home team';
-    const awayTeamName = getTeamName(record.away_team) ?? 'Away team';
-    const isHome = record.home_team_id === teamId;
-
-    return {
-        id: record.id,
-        date: formatShortDate(record.date, locale),
-        opponent: isHome ? awayTeamName : homeTeamName,
-        competitionLabel: getCompetitionLabel(record.league_name),
-        homeTeamName,
-        awayTeamName,
-        homeGoals: record.home_goals ?? 0,
-        awayGoals: record.away_goals ?? 0,
-        homeGoals1H: record.home_goals_1h ?? 0,
-        awayGoals1H: record.away_goals_1h ?? 0,
-        homeGoals2H: (record.home_goals ?? 0) - (record.home_goals_1h ?? 0),
-        awayGoals2H: (record.away_goals ?? 0) - (record.away_goals_1h ?? 0),
-        homeCorners: homeStats?.corners ?? 0,
-        awayCorners: awayStats?.corners ?? 0,
-        homeCorners1H: homeStats1H?.corners ?? 0,
-        awayCorners1H: awayStats1H?.corners ?? 0,
-        homeCorners2H: homeStats2H?.corners ?? 0,
-        awayCorners2H: awayStats2H?.corners ?? 0,
-        homeCards: (homeStats?.yellow_cards ?? 0) + (homeStats?.red_cards ?? 0),
-        awayCards: (awayStats?.yellow_cards ?? 0) + (awayStats?.red_cards ?? 0),
-        homeRedCards: homeStats?.red_cards ?? 0,
-        awayRedCards: awayStats?.red_cards ?? 0,
-        homeBookingPoints: homeStats?.booking_points ?? (homeStats?.yellow_cards ?? 0) * 10 + (homeStats?.red_cards ?? 0) * 25,
-        awayBookingPoints: awayStats?.booking_points ?? (awayStats?.yellow_cards ?? 0) * 10 + (awayStats?.red_cards ?? 0) * 25,
-        homeShots: homeStats?.total_shots ?? 0,
-        awayShots: awayStats?.total_shots ?? 0,
-        homeShotsOnTarget: homeStats?.shots_on_target ?? 0,
-        awayShotsOnTarget: awayStats?.shots_on_target ?? 0,
-        homeFouls: homeStats?.fouls ?? 0,
-        awayFouls: awayStats?.fouls ?? 0,
-        homeOffsides: homeStats?.offsides ?? 0,
-        awayOffsides: awayStats?.offsides ?? 0,
-        homeGoalKicks: homeStats?.goal_kicks ?? 0,
-        awayGoalKicks: awayStats?.goal_kicks ?? 0,
-        homeThrowIns: homeStats?.throw_ins ?? 0,
-        awayThrowIns: awayStats?.throw_ins ?? 0,
-        homeTackles: homeStats?.tackles ?? 0,
-        awayTackles: awayStats?.tackles ?? 0,
-        isHome,
-    };
-}
-
 function summarizeTeamForm(matches: HistoricalMatch[]) {
     return matches.reduce(
         (summary, match) => {
-            const teamGoals = match.isHome ? match.homeGoals : match.awayGoals;
-            const opponentGoals = match.isHome ? match.awayGoals : match.homeGoals;
-
-            if (teamGoals > opponentGoals) summary.wins += 1;
-            else if (teamGoals === opponentGoals) summary.draws += 1;
-            else summary.losses += 1;
-
+            if (match.result === 'win') summary.wins += 1;
+            else if (match.result === 'draw') summary.draws += 1;
+            else if (match.result === 'loss') summary.losses += 1;
             return summary;
         },
         { wins: 0, draws: 0, losses: 0 },
@@ -217,6 +134,7 @@ function useUpcomingFixtures(dateWindow: string[]) {
 function useComparisonData(
     fixtureId: number | null,
     scope: ComparisonScope,
+    marketKey: string | null,
     enabled = true,
 ) {
     const [data, setData] = useState<ComparisonCoreResponse>(EMPTY_COMPARISON_DATA);
@@ -224,7 +142,7 @@ function useComparisonData(
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        let cancelled = false;
+        const controller = new AbortController();
 
         async function loadComparisonPayload() {
             if (!enabled || !fixtureId) {
@@ -237,18 +155,22 @@ function useComparisonData(
             setIsLoading(true);
             setErrorMessage(null);
 
+            const params = new URLSearchParams({
+                fixtureId: String(fixtureId),
+                scope,
+            });
+            if (marketKey) params.set('marketKey', marketKey);
+
             try {
                 const response = await fetchJson<ComparisonCoreResponse>(
-                    `/api/v1/comparison?fixtureId=${fixtureId}&scope=${scope}`,
+                    `/api/v1/comparison?${params.toString()}`,
+                    { signal: controller.signal },
                 );
-
-                if (cancelled) return;
-
+                if (controller.signal.aborted) return;
                 setData(response);
                 setIsLoading(false);
             } catch (error) {
-                if (cancelled) return;
-
+                if (controller.signal.aborted) return;
                 console.error('Failed to load comparison data', error);
                 setData(EMPTY_COMPARISON_DATA);
                 setErrorMessage('Comparison data could not be loaded.');
@@ -259,9 +181,9 @@ function useComparisonData(
         void loadComparisonPayload();
 
         return () => {
-            cancelled = true;
+            controller.abort();
         };
-    }, [enabled, fixtureId, scope]);
+    }, [enabled, fixtureId, scope, marketKey]);
 
     return { data, errorMessage, isLoading };
 }
@@ -381,19 +303,10 @@ export default function ComparisonPage() {
         data: comparisonData,
         errorMessage: comparisonErrorMessage,
         isLoading: isComparisonLoading,
-    } = useComparisonData(effectiveFixtureId, scope, needsComparisonData);
-    const homeMatches = useMemo(() => {
-        if (!effectiveHomeTeamId) return [] as HistoricalMatch[];
-        return comparisonData.homeMatches.map((item) => mapFixtureToHistoricalMatch(item, effectiveHomeTeamId, locale));
-    }, [comparisonData.homeMatches, effectiveHomeTeamId, locale]);
-    const awayMatches = useMemo(() => {
-        if (!effectiveAwayTeamId) return [] as HistoricalMatch[];
-        return comparisonData.awayMatches.map((item) => mapFixtureToHistoricalMatch(item, effectiveAwayTeamId, locale));
-    }, [comparisonData.awayMatches, effectiveAwayTeamId, locale]);
-    const headToHeadMatches = useMemo(() => {
-        if (!effectiveHomeTeamId) return [] as HistoricalMatch[];
-        return comparisonData.headToHeadMatches.map((item) => mapFixtureToHistoricalMatch(item, effectiveHomeTeamId, locale));
-    }, [comparisonData.headToHeadMatches, effectiveHomeTeamId, locale]);
+    } = useComparisonData(effectiveFixtureId, scope, selectedMarketKey, needsComparisonData);
+    const homeMatches = comparisonData.homeMatches;
+    const awayMatches = comparisonData.awayMatches;
+    const headToHeadMatches = comparisonData.headToHeadMatches;
     const homeStatSummary = comparisonData.homeSummary;
     const awayStatSummary = comparisonData.awaySummary;
     const homeTrends = comparisonData.homeTrends;

@@ -2,22 +2,6 @@ export type NameRelation = { name: string };
 export type TeamOption = { id: number; name: string; logo_url: string | null };
 export type TeamRelation = { id: number; name: string; logo_url?: string | null };
 
-export type FixtureStatisticRecord = {
-  team_id: number;
-  period: string;
-  corners: number | null;
-  yellow_cards: number | null;
-  red_cards: number | null;
-  booking_points: number | null;
-  total_shots: number | null;
-  shots_on_target: number | null;
-  fouls: number | null;
-  offsides: number | null;
-  goal_kicks: number | null;
-  throw_ins: number | null;
-  tackles: number | null;
-};
-
 export type UpcomingFixtureRecord = {
   id: number;
   date: string;
@@ -37,103 +21,54 @@ export type UpcomingFixtureRecord = {
   away_team_view?: TeamRelation | null;
 };
 
-export type HistoricalFixtureRecord = {
-  id: number;
-  date: string;
-  league_id?: number;
-  season?: number;
-  home_goals: number | null;
-  away_goals: number | null;
-  home_goals_1h?: number | null;
-  away_goals_1h?: number | null;
-  home_team_id: number;
-  away_team_id: number;
-  league_name?: string | null;
-  home_team: TeamRelation | TeamRelation[] | null;
-  away_team: TeamRelation | TeamRelation[] | null;
-  fixture_statistics: FixtureStatisticRecord[];
-};
-
 export type HistoricalMatch = {
   id: number;
   date: string;
-  opponent: string;
+  playedAt: string;
   competitionLabel: string;
   homeTeamName: string;
   awayTeamName: string;
-  homeGoals: number;
-  awayGoals: number;
-  homeGoals1H: number;
-  awayGoals1H: number;
-  homeGoals2H: number;
-  awayGoals2H: number;
-  homeCorners: number;
-  awayCorners: number;
-  homeCorners1H: number;
-  awayCorners1H: number;
-  homeCorners2H: number;
-  awayCorners2H: number;
-  homeCards: number;
-  awayCards: number;
-  homeRedCards: number;
-  awayRedCards: number;
-  homeBookingPoints: number;
-  awayBookingPoints: number;
-  homeShots: number;
-  awayShots: number;
-  homeShotsOnTarget: number;
-  awayShotsOnTarget: number;
-  homeFouls: number;
-  awayFouls: number;
-  homeOffsides: number;
-  awayOffsides: number;
-  homeGoalKicks: number;
-  awayGoalKicks: number;
-  homeThrowIns: number;
-  awayThrowIns: number;
-  homeTackles: number;
-  awayTackles: number;
   isHome: boolean;
-};
+  result: 'win' | 'draw' | 'loss' | null;
+  dataQuality: 'ok' | 'partial' | 'missing_stats';
 
-export type Metrics = {
-  hitRate: number;
-  hits: number;
-  total: number;
-  avg: string;
-  currentStreak: number;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  homeGoals1H: number | null;
+  awayGoals1H: number | null;
+  homeGoals2H: number | null;
+  awayGoals2H: number | null;
+
+  homeCorners: number | null;
+  awayCorners: number | null;
+  homeCorners1H: number | null;
+  awayCorners1H: number | null;
+  homeCorners2H: number | null;
+  awayCorners2H: number | null;
+
+  homeCards: number | null;
+  awayCards: number | null;
+  homeRedCards: number | null;
+  awayRedCards: number | null;
+
+  homeBookingPoints: number | null;
+  awayBookingPoints: number | null;
+
+  homeShots: number | null;
+  awayShots: number | null;
+  homeShotsOnTarget: number | null;
+  awayShotsOnTarget: number | null;
+
+  homeFouls: number | null;
+  awayFouls: number | null;
+
+  homeOffsides: number | null;
+  awayOffsides: number | null;
+
+  hit: boolean | null;
 };
 
 export type ComparisonScope = 'all' | 'split';
-
-export type FormResult = 'W' | 'D' | 'L';
-
-export type LeagueRecord = {
-  position: number;
-  played: number;
-  wins: number;
-  draws: number;
-  losses: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  goalDiff: number;
-  points: number;
-  form: FormResult[];
-};
-
-export type LeagueStandingEntry = {
-  teamId: number;
-  teamName: string;
-  teamLogoUrl: string | null;
-  overall: LeagueRecord;
-  home: LeagueRecord;
-  away: LeagueRecord;
-};
-
-export type LeagueOpponentResult = {
-  homeMatch: HistoricalMatch | null;
-  awayMatch: HistoricalMatch | null;
-};
 
 export type TrendCategoryId =
   | 'all'
@@ -267,11 +202,11 @@ export type TeamStatAveragesRecord = {
 };
 
 export type ComparisonCoreResponse = {
-  awayMatches: HistoricalFixtureRecord[];
+  awayMatches: HistoricalMatch[];
   awaySummary: TeamStatAveragesRecord | null;
   awayTrends: TeamMarketTrendRecord[];
-  headToHeadMatches: HistoricalFixtureRecord[];
-  homeMatches: HistoricalFixtureRecord[];
+  headToHeadMatches: HistoricalMatch[];
+  homeMatches: HistoricalMatch[];
   homeSummary: TeamStatAveragesRecord | null;
   homeTrends: TeamMarketTrendRecord[];
 };

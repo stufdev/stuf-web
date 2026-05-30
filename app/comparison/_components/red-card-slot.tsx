@@ -1,5 +1,5 @@
 type RedCardSlotProps = {
-  redCards: number;
+  redCards: number | null;
   align: 'left' | 'right';
 };
 
@@ -8,7 +8,7 @@ function RedCardMarker() {
 }
 
 export function RedCardSlot({ redCards, align }: RedCardSlotProps) {
-  const cardCount = Math.max(0, redCards);
+  const cardCount = redCards == null ? 0 : Math.max(0, redCards);
 
   return (
     <span
