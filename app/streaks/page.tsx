@@ -1,4 +1,4 @@
-import type { StreakScope } from '@/lib/server/streak-scanner';
+import type { StreakScope, StreakView } from '@/lib/server/streak-scanner';
 import {
   loadActiveStreakMarkets,
   loadGlobalStreakRows,
@@ -19,6 +19,7 @@ const DEFAULT_FILTERS: StreakScannerFilters = {
   marketKey: 'ALL',
   minStreak: 5,
   scope: 'overall',
+  view: 'active',
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -46,6 +47,10 @@ function parseMarketKey(value: string | string[] | undefined) {
   return rawValue ? rawValue : DEFAULT_FILTERS.marketKey;
 }
 
+function parseView(value: string | string[] | undefined): StreakView {
+  return firstParam(value) === 'season' ? 'season' : 'active';
+}
+
 async function loadStreaksPageData(filters: StreakScannerFilters) {
   try {
     const marketOptions = await loadActiveStreakMarkets();
@@ -64,6 +69,7 @@ export default async function StreaksPage({ searchParams }: StreaksPageProps) {
     marketKey: parseMarketKey(resolvedSearchParams?.marketKey),
     minStreak: parseMinStreak(resolvedSearchParams?.minStreak),
     scope: parseScope(resolvedSearchParams?.scope),
+    view: parseView(resolvedSearchParams?.view),
   };
 
   const data = await loadStreaksPageData(filters);
@@ -85,7 +91,9 @@ export default async function StreaksPage({ searchParams }: StreaksPageProps) {
           <div>
             <h1 className="text-2xl font-semibold tracking-normal">Streaks</h1>
             <div className="mt-1 text-sm text-[var(--app-text-dim)]">
-              {data.rows.length} active signals · min {filters.minStreak} matches · {filters.scope}
+              {filters.view === 'season'
+                ? `${data.rows.length} season-best entries · peak ≥ ${filters.minStreak} · ${filters.scope}`
+                : `${data.rows.length} active signals · min ${filters.minStreak} matches · ${filters.scope}`}
             </div>
           </div>
           <div className="rounded border border-[var(--app-border)] px-3 py-2 text-xs font-semibold text-[var(--app-text-dim)]">
@@ -95,7 +103,7 @@ export default async function StreaksPage({ searchParams }: StreaksPageProps) {
       </section>
 
       <StreaksFilters filters={filters} marketOptions={data.marketOptions} />
-      <StreaksTable rows={data.rows} />
+      <StreaksTable rows={data.rows} view={filters.view} />
     </main>
   );
 }

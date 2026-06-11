@@ -99,9 +99,13 @@ export function OffsidesQuickFilters({ filters, options, isUpdating = false, onF
           </select>
         </label>
 
-        <label className="flex h-full items-end gap-2 pb-2 text-sm font-semibold text-[var(--app-text-soft)]">
-          <input checked={filters.minSample >= 4} className="h-4 w-4" disabled={isBusy} onChange={(event) => updateQuery({ minSample: event.currentTarget.checked ? 4 : 0 })} type="checkbox" />
-          <span>{'> 3 matches played'}</span>
+        <label className="flex flex-col gap-2">
+          <span className="text-xs font-semibold uppercase text-[var(--app-text-dim)]">Min sample</span>
+          <select className="h-10 rounded border border-[var(--app-input-border)] bg-[var(--app-input-bg)] px-3 text-sm text-[var(--app-text)] outline-none focus:border-[var(--app-accent)]" disabled={isBusy} onChange={(event) => updateQuery({ minSample: Number(event.target.value) })} value={filters.minSample >= 20 ? 20 : filters.minSample >= 15 ? 15 : 10}>
+            <option value={10}>≥ 10 (floor)</option>
+            <option value={15}>≥ 15</option>
+            <option value={20}>≥ 20</option>
+          </select>
         </label>
       </div>
 

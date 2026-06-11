@@ -28,7 +28,7 @@ export function applyTheme(theme: ResolvedTheme, themeMode: ThemeMode) {
   root.style.colorScheme = theme;
   document.body.style.colorScheme = theme;
 
-  // Shadcn uses `.dark` class — keep in sync
+  // Keep in sync with the `.dark` class on <html>.
   if (theme === 'dark') {
     root.classList.add('dark');
   } else {

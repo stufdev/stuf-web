@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getDateRange } from '@/lib/date';
+import { getDateRange, getRecentDateRange } from '@/lib/date';
 import type {
   FixtureLeagueContext,
   FixtureTeamRelation,
@@ -71,6 +71,36 @@ function mapUpcomingFixtureView(
     home_team_view: homeTeam,
     league_name: league?.name ?? null,
   };
+}
+
+/**
+ * Load recently-completed fixtures (FT / AET / PEN) from the past `windowDays` days.
+ * Used for off-season Season Review on the Fixtures board and Comparison date picker.
+ */
+export async function loadRecentFixtures(
+  windowDays: number,
+  feature: SupportedLeagueFeature = 'fixtures',
+) {
+  const targetLeagueIds = await getSupportedLeagueIds(feature);
+
+  const supabaseAdmin = getSupabaseAdmin();
+  const { start, end } = getRecentDateRange(windowDays);
+  const { data, error } = await supabaseAdmin
+    .from('fixtures')
+    .select(UPCOMING_FIXTURE_SELECT)
+    .in('league_id', targetLeagueIds)
+    .in('status_short', [...FINISHED_STATUSES])
+    .gte('date', start.toISOString())
+    .lte('date', end.toISOString())
+    .order('date', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to load recent fixtures: ${error.message}`);
+  }
+
+  const fixtures = (data ?? []) as UpcomingFixtureRecord[];
+  const leagueMap = await loadLeagueContextMap([...new Set(fixtures.map((fixture) => fixture.league_id))]);
+  return fixtures.map((fixture) => mapUpcomingFixtureView(fixture, leagueMap));
 }
 
 export async function loadUpcomingFixtures(

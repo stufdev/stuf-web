@@ -1,7 +1,14 @@
 import 'server-only';
 
 import { unstable_cache } from 'next/cache';
+import { getSupportedLeagueIds } from './league-config';
 import { getSupabaseAdmin } from './supabase-admin';
+import {
+  EMERGING_MIN_SAMPLE,
+  MAIN_RANKING_MIN_SAMPLE,
+  HIGH_CONFIDENCE_MIN_SAMPLE,
+  parseMainRankingFloor,
+} from './sample-bands';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Types
@@ -75,6 +82,9 @@ export type PlayerPropRankingRow = {
   last10Hits: number | null;
   last10Percentage: number | null;
   rank: number;
+  // P0 band markers. `highConfidence` = sample ≥ 15 (eligible for stronger marker).
+  // The main-vs-emerging split is conveyed by which result array a row lands in.
+  highConfidence: boolean;
   nextFixtureId: number | null;
   nextFixtureDate: string | null;
   nextOpponentTeamId: number | null;
@@ -116,7 +126,10 @@ export type PlayerPropRankingResult = {
   propLabel: string;
   propAvailable: boolean;
   scope: PropScope;
+  // Main ranking: sample ≥ 10 only (P0 main-ranking floor).
   rows: PlayerPropRankingRow[];
+  // Emerging / low-sample: sample 5–9, shown separately with a warning. Never mixed into `rows`.
+  emergingRows: PlayerPropRankingRow[];
 };
 
 export type PlayerPropEvidenceResult = {
@@ -132,9 +145,16 @@ export type PlayerPropEvidenceResult = {
 // ──────────────────────────────────────────────────────────────────────────────
 
 const PROP_CACHE_SECONDS = 60;
-const MAX_RANKING_ROWS = 200;
+// The DB query is already tightly scoped by (prop_key, league_id, season, scope),
+// so the natural population is one row per eligible player-team in a single league
+// (~700 max). A cap above that population means the in-memory filters
+// (minPercentage, minMatches, player/team search) see the COMPLETE candidate set
+// rather than only the pre-computed top 200 by rank. Previously the hard 200 cap
+// ran BEFORE those filters, hiding any valid player ranked >200 from search and
+// percentage filters. Keep this above the natural single-scope population.
+const MAX_RANKING_ROWS = 1000;
 
-const V1_LEAGUE_IDS = [39, 61, 78, 135, 140] as const;
+// Removed: V1_LEAGUE_IDS hardcoded array. Use getSupportedLeagueIds() dynamically.
 
 export const PROP_CATEGORIES: PropCategory[] = ['attacking', 'shots', 'cards', 'fouls', 'tackles', 'fouled'];
 
@@ -252,9 +272,11 @@ export function parsePlayerPropFilters(
     propKey,
     scope: parseScope(searchParams?.scope),
     minPercentage: Math.max(0, Math.min(100, parseInteger(searchParams?.minPercentage) ?? 0)),
-    minMatches: Math.max(0, parseInteger(searchParams?.minMatches) ?? 0),
+    // Raise-only main-ranking floor (10 / 15 / 20). Never drops below the P0 floor of 10.
+    minMatches: parseMainRankingFloor(parseInteger(searchParams?.minMatches)),
     playerSearch: firstParam(searchParams?.playerSearch)?.trim() ?? '',
-    upcomingOnly: upcomingOnlyRaw === 'false' ? false : true,
+    // Season Review default: show all historical rankings; user opts INTO upcoming-only view.
+    upcomingOnly: upcomingOnlyRaw === 'true' ? true : false,
   };
 }
 
@@ -459,6 +481,7 @@ function rawToRankingRow(r: RawRankingRow): PlayerPropRankingRow {
     last10Hits: r.last_10_hits,
     last10Percentage: toFiniteNumber(r.last_10_percentage),
     rank: r.rank,
+    highConfidence: r.sample >= HIGH_CONFIDENCE_MIN_SAMPLE,
     nextFixtureId: r.next_fixture_id,
     nextFixtureDate: r.next_fixture_date,
     nextOpponentTeamId: r.next_opponent_team_id,
@@ -506,15 +529,17 @@ async function loadPlayerPropFilterOptionsUncached(): Promise<PlayerPropFilterOp
 
   const [{ data: supportedData, error: supportedError }, { data: propData, error: propError }] =
     await Promise.all([
-      supabaseAdmin
-        .from('supported_leagues')
-        .select('league_id, season')
-        .eq('is_active', true)
-        .eq('enabled_for_comparison', true)
-        .in('league_id', [...V1_LEAGUE_IDS])
-        .order('display_order', { ascending: true })
-        .order('league_id', { ascending: true })
-        .order('season', { ascending: false }),
+      getSupportedLeagueIds('comparison').then(async (comparisonLeagueIds) => {
+        return supabaseAdmin
+          .from('supported_leagues')
+          .select('league_id, season')
+          .eq('is_active', true)
+          .eq('enabled_for_comparison', true)
+          .in('league_id', comparisonLeagueIds)
+          .order('display_order', { ascending: true })
+          .order('league_id', { ascending: true })
+          .order('season', { ascending: false });
+      }),
       supabaseAdmin
         .from('player_prop_definitions')
         .select('key, category, family, label, metric, operator, line, display_order, is_active')
@@ -608,7 +633,10 @@ const loadPlayerPropRankingSnapshotRows = unstable_cache(
       .eq('prop_key', propKey)
       .eq('league_id', leagueId)
       .eq('season', season)
-      .eq('scope', scope);
+      .eq('scope', scope)
+      // P0 noise floor pushed to the DB: drop sub-5-appearance rows before the
+      // limit so the cap is never spent on noise the UI would discard anyway.
+      .gte('sample', EMERGING_MIN_SAMPLE);
 
     if (upcomingOnly) {
       query = query.not('next_fixture_id', 'is', null);
@@ -767,7 +795,11 @@ export async function loadPlayerPropRankingsWithTiming(
   const transformStartedAt = Date.now();
   const normalizedSearch = filters.playerSearch.trim().toLowerCase();
   const filtered = rawRows.filter((row) => {
-    if (filters.minMatches > 0 && row.sample < filters.minMatches) return false;
+    // P0 hard floor: sample < 5 is never promoted as a signal (noise band).
+    // This is a product standard; user filters can only raise it, never lower it.
+    // The raise-only main floor (filters.minMatches) is applied at the band split
+    // below so it raises the main ranking without removing the 5–9 emerging band.
+    if (row.sample < EMERGING_MIN_SAMPLE) return false;
     if (filters.minPercentage > 0) {
       const pct = toFiniteNumber(row.percentage) ?? 0;
       if (pct < filters.minPercentage) return false;
@@ -780,7 +812,17 @@ export async function loadPlayerPropRankingsWithTiming(
     return true;
   });
 
-  const rows = filtered.map(rawToRankingRow);
+  // Split into bands and re-rank within each (DB rank is over the full unbanded set).
+  const mapped = filtered.map(rawToRankingRow);
+  // Main ranking honours the raise-only floor (>= 10, optionally 15 / 20).
+  const mainFloor = Math.max(MAIN_RANKING_MIN_SAMPLE, filters.minMatches);
+  const rows = mapped
+    .filter((row) => row.sample >= mainFloor)
+    .map((row, i) => ({ ...row, rank: i + 1 }));
+  // Emerging band is fixed at 5–9 and stays visible regardless of the raised floor.
+  const emergingRows = mapped
+    .filter((row) => row.sample >= EMERGING_MIN_SAMPLE && row.sample < MAIN_RANKING_MIN_SAMPLE)
+    .map((row, i) => ({ ...row, rank: i + 1 }));
   const transformMs = Date.now() - transformStartedAt;
 
   return {
@@ -790,6 +832,7 @@ export async function loadPlayerPropRankingsWithTiming(
       propAvailable: propDef?.isActive === true,
       scope: filters.scope,
       rows,
+      emergingRows,
     },
     timing: {
       dbMs,

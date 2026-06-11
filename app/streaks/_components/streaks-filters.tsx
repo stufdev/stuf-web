@@ -2,13 +2,14 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { startTransition } from 'react';
-import type { StreakMarketOption, StreakScope } from '@/lib/server/streak-scanner';
+import type { StreakMarketOption, StreakScope, StreakView } from '@/lib/server/streak-scanner';
 
 type StreaksFiltersProps = {
   filters: {
     marketKey: string;
     minStreak: number;
     scope: StreakScope;
+    view: StreakView;
   };
   marketOptions: StreakMarketOption[];
 };
@@ -37,6 +38,7 @@ export function StreaksFilters({ filters, marketOptions }: StreaksFiltersProps) 
     const nextMarketKey = nextValues.marketKey ?? filters.marketKey;
     const nextMinStreak = nextValues.minStreak ?? filters.minStreak;
     const nextScope = nextValues.scope ?? filters.scope;
+    const nextView = nextValues.view ?? filters.view;
 
     if (nextMarketKey === 'ALL') {
       params.delete('marketKey');
@@ -56,6 +58,13 @@ export function StreaksFilters({ filters, marketOptions }: StreaksFiltersProps) 
       params.set('scope', nextScope);
     }
 
+    // 'active' is the default; only serialize when switching to season mode
+    if (nextView === 'active') {
+      params.delete('view');
+    } else {
+      params.set('view', nextView);
+    }
+
     const queryString = params.toString();
     startTransition(() => {
       router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
@@ -68,9 +77,14 @@ export function StreaksFilters({ filters, marketOptions }: StreaksFiltersProps) 
     updateQuery({ minStreak: nextValue });
   }
 
+  const VIEW_OPTIONS: Array<{ label: string; value: StreakView }> = [
+    { label: 'Active', value: 'active' },
+    { label: 'Season best', value: 'season' },
+  ];
+
   return (
     <section className="border-y border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-4">
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.2fr)_150px_minmax(260px,1fr)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.2fr)_150px_minmax(260px,1fr)_minmax(200px,1fr)]">
         <label className="flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase text-[var(--app-text-dim)]">Market</span>
           <select
@@ -121,6 +135,30 @@ export function StreaksFilters({ filters, marketOptions }: StreaksFiltersProps) 
                   ].join(' ')}
                   key={option.value}
                   onClick={() => updateQuery({ scope: option.value })}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-semibold uppercase text-[var(--app-text-dim)]">View</span>
+          <div className="grid h-10 grid-cols-2 overflow-hidden rounded border border-[var(--app-input-border)] bg-[var(--app-input-bg)]">
+            {VIEW_OPTIONS.map((option) => {
+              const isActive = option.value === filters.view;
+              return (
+                <button
+                  className={[
+                    'text-sm font-semibold transition-colors',
+                    isActive
+                      ? 'bg-[var(--app-accent)] text-white'
+                      : 'text-[var(--app-text-soft)] hover:bg-[var(--app-panel-muted)]',
+                  ].join(' ')}
+                  key={option.value}
+                  onClick={() => updateQuery({ view: option.value })}
                   type="button"
                 >
                   {option.label}

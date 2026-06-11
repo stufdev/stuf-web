@@ -3,6 +3,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { addDays, formatDateKey } from '@/lib/date';
 import { getSupabaseAdmin } from './supabase-admin';
+import { EMERGING_MIN_SAMPLE, MAIN_RANKING_MIN_SAMPLE, parseMainRankingFloor } from './sample-bands';
 
 export type CardScope = 'overall' | 'home' | 'away';
 export type CardViewMode = 'all' | 'homeaway';
@@ -176,6 +177,7 @@ export type CardQuickResult = {
   marketLabel: string;
   marketAvailable: boolean;
   columns: CardQuickColumn[];
+  emergingColumns: CardQuickColumn[];
 };
 
 export type CardQuickTiming = {
@@ -884,7 +886,7 @@ export function parseCardQuickFilters(searchParams: CardSearchParams | undefined
     teamSearch: firstParam(searchParams?.teamSearch)?.trim() ?? '',
     formWindow: parseFormWindow(searchParams?.formWindow),
     fixtureFilter: parseFixtureFilter(searchParams?.fixtureFilter),
-    minSample: (parseInteger(searchParams?.minSample) ?? 0) >= 4 ? 4 : 0,
+    minSample: parseMainRankingFloor(parseInteger(searchParams?.minSample)),
   };
 }
 
@@ -1220,13 +1222,14 @@ export async function loadCardQuickScannerWithTiming(
   const transformStartedAt = Date.now();
   const marketLabel = marketDefinition?.label ?? fallbackMarketLabel(filters.statistic, filters.line);
   const normalizedSearch = filters.teamSearch.trim().toLowerCase();
-  const columns: CardQuickColumn[] = SCOPES.map((scope) => {
+  const candidatesByScope = new Map<CardScope, CardQuickRow[]>();
+  for (const scope of SCOPES) {
     const rows = snapshotRows
       .filter((row) => row.scope === scope)
       .flatMap((row) => {
         if (normalizedSearch && !row.team_name.toLowerCase().includes(normalizedSearch)) return [];
         const metric = metricFromQuickSnapshot(row, filters.formWindow);
-        if (metric.sample < filters.minSample) return [];
+        if (metric.sample < EMERGING_MIN_SAMPLE) return [];
 
         const nextFixture = row.next_fixture_id !== null && row.next_fixture_date !== null && row.next_opponent_team_id !== null && row.next_opponent_name !== null && row.next_venue_scope !== null
           ? {
@@ -1261,9 +1264,20 @@ export async function loadCardQuickScannerWithTiming(
         right.metric.hits - left.metric.hits ||
         right.metric.sample - left.metric.sample ||
         left.teamName.localeCompare(right.teamName)
-      ))
-      .slice(0, QUICK_RESULT_LIMIT_PER_SCOPE);
+      ));
+    candidatesByScope.set(scope, rows);
+  }
 
+  const columns: CardQuickColumn[] = SCOPES.map((scope) => {
+    const rows = (candidatesByScope.get(scope) ?? [])
+      .filter((row) => row.metric.sample >= filters.minSample)
+      .slice(0, QUICK_RESULT_LIMIT_PER_SCOPE);
+    return { scope, title: scopeTitle(scope), rows };
+  });
+  const emergingColumns: CardQuickColumn[] = SCOPES.map((scope) => {
+    const rows = (candidatesByScope.get(scope) ?? [])
+      .filter((row) => row.metric.sample >= EMERGING_MIN_SAMPLE && row.metric.sample < MAIN_RANKING_MIN_SAMPLE)
+      .slice(0, QUICK_RESULT_LIMIT_PER_SCOPE);
     return { scope, title: scopeTitle(scope), rows };
   });
 
@@ -1273,6 +1287,7 @@ export async function loadCardQuickScannerWithTiming(
       marketLabel,
       marketAvailable: marketDefinition?.is_active === true,
       columns,
+      emergingColumns,
     },
     timing: {
       dbMs,

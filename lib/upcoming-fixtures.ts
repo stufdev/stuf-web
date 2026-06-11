@@ -40,3 +40,8 @@ export type UpcomingFixtureView = UpcomingFixtureRecord & {
 export async function fetchUpcomingFixtures(windowDays: number) {
   return fetchJson<UpcomingFixtureView[]>(`/api/v1/upcoming-fixtures?days=${windowDays}`);
 }
+
+/** Fetches recently-completed fixtures (FT/AET/PEN) from the last `windowDays` days. */
+export async function fetchRecentFixtures(windowDays: number) {
+  return fetchJson<UpcomingFixtureView[]>(`/api/v1/recent-fixtures?days=${windowDays}`);
+}

@@ -24,6 +24,16 @@ export function getDateRange(windowDays: number, baseDate = new Date()) {
   };
 }
 
+/** Returns the range [today - windowDays, today] for querying recently-completed fixtures. */
+export function getRecentDateRange(windowDays: number, baseDate = new Date()) {
+  const end = new Date(baseDate);
+  end.setHours(23, 59, 59, 999);
+  return {
+    start: addDays(end, -windowDays),
+    end,
+  };
+}
+
 export function getDateWindowKeys(windowDays: number, baseDate = new Date()) {
   const { start } = getDateRange(windowDays, baseDate);
   return Array.from({ length: windowDays }, (_, index) => formatDateKey(addDays(start, index)));

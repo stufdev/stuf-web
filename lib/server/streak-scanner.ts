@@ -2,12 +2,22 @@ import 'server-only';
 
 import { getDateRange } from '@/lib/date';
 import { getSupabaseAdmin } from './supabase-admin';
-import { getSupportedLeagueIds } from './league-config';
+import { getSupportedLeagueIds, getSupportedLeagueSeasons } from './league-config';
+import { EMERGING_MIN_SAMPLE } from './sample-bands';
+import {
+  buildStreakContextMetrics,
+  deriveStreakSignalMetrics,
+  streakContextKey,
+  type StreakSignalBand,
+} from './streaks-informativeness';
 
 export type StreakScope = 'overall' | 'home' | 'away';
+/** 'active' = currently-ongoing streak (requires upcoming fixture). 'season' = season-best using longest_streak, no fixture required. */
+export type StreakView = 'active' | 'season';
 
-const NEXT_FIXTURE_WINDOW_DAYS = 6;
-const STREAK_CANDIDATE_LIMIT = 200;
+const NEXT_FIXTURE_WINDOW_DAYS = 14; // Wide enough for WC 2026 off-season gaps
+const STREAK_CONTEXT_PAGE_SIZE = 1000;
+const STREAK_CANDIDATE_LIMIT = 2000;
 const STREAK_RESULT_LIMIT = 50;
 const COMPARISON_UPCOMING_STATUSES = ['NS', 'TBD'] as const;
 
@@ -15,6 +25,7 @@ export type StreakScannerFilters = {
   marketKey: string;
   minStreak: number;
   scope: StreakScope;
+  view: StreakView;
 };
 
 export type StreakMarketOption = {
@@ -45,7 +56,17 @@ export type StreakScannerRow = {
   hits: number;
   percentage: number;
   currentStreak: number;
+  /** Peak consecutive streak during the season. Always populated. */
+  longestStreak: number;
   nextFixture: StreakNextFixture | null;
+  signalValue: number;
+  signalBand: StreakSignalBand;
+  teamHitRate: number | null;
+  leagueMarketAvg: number | null;
+  leagueMarketStd: number | null;
+  zScore: number | null;
+  contextTeams: number;
+  isLowInformation: boolean;
 };
 
 type MarketDefinitionRow = {
@@ -64,6 +85,7 @@ type TeamSeasonMarketStatRow = {
   hits: number;
   percentage: number | string;
   current_streak: number;
+  longest_streak: number;
 };
 
 type TeamRow = {
@@ -121,6 +143,7 @@ function toStatRows(rows: unknown[]): TeamSeasonMarketStatRow[] {
       typeof record.sample !== 'number' ||
       typeof record.hits !== 'number' ||
       typeof record.current_streak !== 'number' ||
+      typeof record.longest_streak !== 'number' ||
       (typeof record.percentage !== 'number' && typeof record.percentage !== 'string')
     ) {
       return [];
@@ -136,6 +159,7 @@ function toStatRows(rows: unknown[]): TeamSeasonMarketStatRow[] {
       hits: record.hits,
       percentage: record.percentage,
       current_streak: record.current_streak,
+      longest_streak: record.longest_streak,
     }];
   });
 }
@@ -220,6 +244,53 @@ function isActionableNextFixture(
   return true;
 }
 
+function toInformativenessInput(row: TeamSeasonMarketStatRow) {
+  return {
+    teamId: row.team_id,
+    leagueId: row.league_id,
+    season: row.season,
+    scope: row.scope,
+    marketKey: row.market_key,
+    sample: row.sample,
+    hits: row.hits,
+  };
+}
+
+async function loadContextStatRows(params: {
+  scope: StreakScope;
+  leagueIds: number[];
+  seasons: number[];
+  marketKeys: string[];
+  isAllowedLeagueSeason: (row: TeamSeasonMarketStatRow) => boolean;
+}) {
+  const supabaseAdmin = getSupabaseAdmin();
+  const rows: TeamSeasonMarketStatRow[] = [];
+
+  for (let offset = 0; ; offset += STREAK_CONTEXT_PAGE_SIZE) {
+    const { data, error } = await supabaseAdmin
+      .from('team_season_market_stats')
+      .select('team_id, league_id, season, scope, market_key, sample, hits, percentage, current_streak, longest_streak')
+      .gte('sample', EMERGING_MIN_SAMPLE)
+      .eq('scope', params.scope)
+      .in('league_id', params.leagueIds)
+      .in('season', params.seasons)
+      .in('market_key', params.marketKeys)
+      .range(offset, offset + STREAK_CONTEXT_PAGE_SIZE - 1);
+
+    if (error) {
+      throw new Error(`Failed to load streak context rows: ${error.message}`);
+    }
+
+    const pageRows = toStatRows((data ?? []) as unknown[]);
+    rows.push(...pageRows);
+    if (pageRows.length < STREAK_CONTEXT_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return rows.filter(params.isAllowedLeagueSeason);
+}
+
 export async function loadActiveStreakMarkets(): Promise<StreakMarketOption[]> {
   const supabaseAdmin = getSupabaseAdmin();
   const { data, error } = await supabaseAdmin
@@ -254,16 +325,126 @@ export async function loadGlobalStreakRows(
   }
 
   const supabaseAdmin = getSupabaseAdmin();
-  const [streakLeagueIds, comparisonLeagueIds] = await Promise.all([
-    getSupportedLeagueIds('streaks'),
+  const [streakSeasonPairs, comparisonLeagueIds] = await Promise.all([
+    getSupportedLeagueSeasons('streaks'),
     getSupportedLeagueIds('comparison'),
   ]);
+
+  // Explicit season scoping. team_season_market_stats is season-keyed; without a
+  // season filter a league holding two seasons (e.g. WC 2026 alongside the 2025
+  // club season) would mix streaks across seasons. Filter the DB query by the
+  // current configured seasons, then post-filter by the exact (league, season)
+  // pairs so a league cannot leak a non-current season even if both are returned.
+  const streakLeagueIds = [...new Set(streakSeasonPairs.map((pair) => pair.leagueId))];
+  const streakSeasons = [...new Set(streakSeasonPairs.map((pair) => pair.season))];
+  const allowedLeagueSeasonPairs = new Set(
+    streakSeasonPairs.map((pair) => `${pair.leagueId}:${pair.season}`),
+  );
+  const isAllowedLeagueSeason = (row: TeamSeasonMarketStatRow) =>
+    allowedLeagueSeasonPairs.has(`${row.league_id}:${row.season}`);
+  const contextRows = await loadContextStatRows({
+    scope: filters.scope,
+    leagueIds: streakLeagueIds,
+    seasons: streakSeasons,
+    marketKeys: selectedMarketKeys,
+    isAllowedLeagueSeason,
+  });
+  const contextMetricsByKey = buildStreakContextMetrics(contextRows.map(toInformativenessInput));
+  const isAllMarketsView = filters.marketKey === 'ALL';
+
+  // ── Season-best mode ────────────────────────────────────────────────────────
+  // No upcoming fixture required. Ranks by longest_streak this season.
+  // Useful for off-season review and trend analysis.
+  if (filters.view === 'season') {
+    const { data: statData, error: statError } = await supabaseAdmin
+      .from('team_season_market_stats')
+      .select('team_id, league_id, season, scope, market_key, sample, hits, percentage, current_streak, longest_streak')
+      .gte('longest_streak', filters.minStreak)
+      .gte('sample', EMERGING_MIN_SAMPLE)
+      .eq('scope', filters.scope)
+      .in('league_id', streakLeagueIds)
+      .in('season', streakSeasons)
+      .in('market_key', selectedMarketKeys)
+      .order('longest_streak', { ascending: false })
+      .limit(STREAK_CANDIDATE_LIMIT);
+
+    if (statError) {
+      throw new Error(`Failed to load season streak rows: ${statError.message}`);
+    }
+
+    const statRows = toStatRows((statData ?? []) as unknown[]).filter(isAllowedLeagueSeason);
+    if (statRows.length === 0) return [];
+
+    const teamIds = [...new Set(statRows.map((row) => row.team_id))];
+    const leagueIds = [...new Set(statRows.map((row) => row.league_id))];
+
+    const [{ data: teamData, error: teamError }, { data: leagueData, error: leagueError }] = await Promise.all([
+      supabaseAdmin.from('teams').select('id, name, logo_url').in('id', teamIds),
+      supabaseAdmin.from('leagues').select('id, name, logo_url').in('id', leagueIds),
+    ]);
+
+    if (teamError) throw new Error(`Failed to load streak teams: ${teamError.message}`);
+    if (leagueError) throw new Error(`Failed to load streak leagues: ${leagueError.message}`);
+
+    const teamsById = new Map(toTeamRows((teamData ?? []) as unknown[]).map((team) => [team.id, team]));
+    const leaguesById = new Map(toLeagueRows((leagueData ?? []) as unknown[]).map((league) => [league.id, league]));
+
+    return statRows.map((row) => {
+      const team = teamsById.get(row.team_id);
+      const league = leaguesById.get(row.league_id);
+      const signal = deriveStreakSignalMetrics(
+        toInformativenessInput(row),
+        contextMetricsByKey.get(streakContextKey(toInformativenessInput(row))),
+        row.longest_streak,
+        { applyLowInformationPenalty: isAllMarketsView },
+      );
+      return {
+        teamId: row.team_id,
+        teamName: team?.name ?? `Team ${row.team_id}`,
+        teamLogoUrl: team?.logo_url ?? null,
+        leagueId: row.league_id,
+        leagueName: league?.name ?? `League ${row.league_id}`,
+        leagueLogoUrl: league?.logo_url ?? null,
+        season: row.season,
+        scope: row.scope,
+        marketKey: row.market_key,
+        marketLabel: activeMarketMap.get(row.market_key) ?? row.market_key,
+        sample: row.sample,
+        hits: row.hits,
+        percentage: toFiniteNumber(row.percentage),
+        currentStreak: row.current_streak,
+        longestStreak: row.longest_streak,
+        nextFixture: null,
+        signalValue: signal.signalValue,
+        signalBand: signal.signalBand,
+        teamHitRate: signal.teamHitRate,
+        leagueMarketAvg: signal.leagueMarketAvg,
+        leagueMarketStd: signal.leagueMarketStd,
+        zScore: signal.zScore,
+        contextTeams: signal.contextTeams,
+        isLowInformation: signal.isLowInformation,
+      } satisfies StreakScannerRow;
+    }).sort((left, right) => (
+      right.signalValue - left.signalValue ||
+      (right.zScore ?? -999) - (left.zScore ?? -999) ||
+      right.longestStreak - left.longestStreak ||
+      right.sample - left.sample ||
+      left.teamId - right.teamId
+    )).slice(0, STREAK_RESULT_LIMIT);
+  }
+
+  // ── Active-streak mode (default) ────────────────────────────────────────────
+  // Requires an upcoming fixture within the window. Shows only actionable rows.
   const { data: statData, error: statError } = await supabaseAdmin
     .from('team_season_market_stats')
-    .select('team_id, league_id, season, scope, market_key, sample, hits, percentage, current_streak')
+    .select('team_id, league_id, season, scope, market_key, sample, hits, percentage, current_streak, longest_streak')
     .gte('current_streak', filters.minStreak)
+    // P0 noise floor: never surface streaks built on fewer than EMERGING_MIN_SAMPLE appearances,
+    // even if the user lowers minStreak below 5. See lib/server/sample-bands.ts.
+    .gte('sample', EMERGING_MIN_SAMPLE)
     .eq('scope', filters.scope)
     .in('league_id', streakLeagueIds)
+    .in('season', streakSeasons)
     .in('market_key', selectedMarketKeys)
     .order('current_streak', { ascending: false })
     .limit(STREAK_CANDIDATE_LIMIT);
@@ -272,7 +453,7 @@ export async function loadGlobalStreakRows(
     throw new Error(`Failed to load streak rows: ${statError.message}`);
   }
 
-  const statRows = toStatRows((statData ?? []) as unknown[]);
+  const statRows = toStatRows((statData ?? []) as unknown[]).filter(isAllowedLeagueSeason);
   if (statRows.length === 0) {
     return [];
   }
@@ -363,6 +544,12 @@ export async function loadGlobalStreakRows(
 
     const team = teamsById.get(row.team_id);
     const league = leaguesById.get(row.league_id);
+    const signal = deriveStreakSignalMetrics(
+      toInformativenessInput(row),
+      contextMetricsByKey.get(streakContextKey(toInformativenessInput(row))),
+      row.current_streak,
+      { applyLowInformationPenalty: isAllMarketsView },
+    );
 
     return [{
       teamId: row.team_id,
@@ -379,7 +566,22 @@ export async function loadGlobalStreakRows(
       hits: row.hits,
       percentage: toFiniteNumber(row.percentage),
       currentStreak: row.current_streak,
+      longestStreak: row.longest_streak,
       nextFixture,
+      signalValue: signal.signalValue,
+      signalBand: signal.signalBand,
+      teamHitRate: signal.teamHitRate,
+      leagueMarketAvg: signal.leagueMarketAvg,
+      leagueMarketStd: signal.leagueMarketStd,
+      zScore: signal.zScore,
+      contextTeams: signal.contextTeams,
+      isLowInformation: signal.isLowInformation,
     } satisfies StreakScannerRow];
-  }).slice(0, STREAK_RESULT_LIMIT);
+  }).sort((left, right) => (
+    right.signalValue - left.signalValue ||
+    (right.zScore ?? -999) - (left.zScore ?? -999) ||
+    right.currentStreak - left.currentStreak ||
+    right.sample - left.sample ||
+    left.teamId - right.teamId
+  )).slice(0, STREAK_RESULT_LIMIT);
 }

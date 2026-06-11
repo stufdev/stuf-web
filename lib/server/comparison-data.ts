@@ -14,6 +14,8 @@ const TEAM_FIXTURE_FACTS_SELECT = `
   fixture_id,
   team_id,
   opponent_team_id,
+  league_id,
+  season,
   played_at,
   is_home,
   venue_scope,
@@ -85,6 +87,8 @@ type TeamFixtureFactsRow = {
   fixture_id: number;
   team_id: number;
   opponent_team_id: number;
+  league_id: number;
+  season: number;
   played_at: string;
   is_home: boolean;
   venue_scope: 'home' | 'away';
@@ -120,6 +124,12 @@ type TeamFixtureFactsRow = {
 
 type MarketHitMap = Map<string, boolean>;
 
+type TeamInfo = {
+  id: number;
+  name: string;
+  national: boolean;
+};
+
 function marketHitKey(teamId: number, fixtureId: number) {
   return `${teamId}:${fixtureId}`;
 }
@@ -131,17 +141,20 @@ async function loadRecentFactsForTeam(
   fixtureDate: string,
   scope: ComparisonScope,
   side: 'home' | 'away',
+  isNationalFixture: boolean,
 ): Promise<TeamFixtureFactsRow[]> {
   const supabaseAdmin = getSupabaseAdmin();
   let query = supabaseAdmin
     .from('team_fixture_facts')
     .select(TEAM_FIXTURE_FACTS_SELECT)
     .eq('team_id', teamId)
-    .eq('league_id', leagueId)
-    .eq('season', season)
     .lt('played_at', fixtureDate)
     .order('played_at', { ascending: false })
     .limit(HISTORICAL_LIMIT);
+
+  if (!isNationalFixture) {
+    query = query.eq('league_id', leagueId).eq('season', season);
+  }
 
   if (scope === 'split') {
     query = query.eq('venue_scope', side);
@@ -161,18 +174,23 @@ async function loadHeadToHeadFacts(
   leagueId: number,
   season: number,
   fixtureDate: string,
+  isNationalFixture: boolean,
 ): Promise<TeamFixtureFactsRow[]> {
   const supabaseAdmin = getSupabaseAdmin();
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('team_fixture_facts')
     .select(TEAM_FIXTURE_FACTS_SELECT)
     .eq('team_id', homeTeamId)
     .eq('opponent_team_id', awayTeamId)
-    .eq('league_id', leagueId)
-    .eq('season', season)
     .lt('played_at', fixtureDate)
     .order('played_at', { ascending: false })
     .limit(HISTORICAL_LIMIT);
+
+  if (!isNationalFixture) {
+    query = query.eq('league_id', leagueId).eq('season', season);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Failed to load head-to-head facts: ${error.message}`);
@@ -181,7 +199,7 @@ async function loadHeadToHeadFacts(
   return (data ?? []) as TeamFixtureFactsRow[];
 }
 
-async function loadTeamNameMap(teamIds: number[]): Promise<Map<number, string>> {
+async function loadTeamInfoMap(teamIds: number[]): Promise<Map<number, TeamInfo>> {
   if (teamIds.length === 0) {
     return new Map();
   }
@@ -189,14 +207,43 @@ async function loadTeamNameMap(teamIds: number[]): Promise<Map<number, string>> 
   const supabaseAdmin = getSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from('teams')
-    .select('id, name')
+    .select('id, name, national')
     .in('id', teamIds);
 
   if (error) {
     throw new Error(`Failed to load team names: ${error.message}`);
   }
 
-  return new Map(((data ?? []) as Array<{ id: number; name: string | null }>).map((row) => [row.id, row.name ?? '']));
+  return new Map(
+    ((data ?? []) as Array<{ id: number; name: string | null; national: boolean | null }>).map((row) => [
+      row.id,
+      { id: row.id, name: row.name ?? '', national: Boolean(row.national) },
+    ]),
+  );
+}
+
+async function loadLeagueLabelMap(leagueIds: number[]): Promise<Map<number, string>> {
+  const uniqueIds = [...new Set(leagueIds.filter((id) => Number.isFinite(id)))];
+  if (uniqueIds.length === 0) {
+    return new Map();
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data, error } = await supabaseAdmin
+    .from('leagues')
+    .select('id, name')
+    .in('id', uniqueIds);
+
+  if (error) {
+    throw new Error(`Failed to load league labels: ${error.message}`);
+  }
+
+  return new Map(
+    ((data ?? []) as Array<{ id: number; name: string | null }>).map((row) => [
+      row.id,
+      getCompetitionLabel(row.name),
+    ]),
+  );
 }
 
 async function loadMarketHits(
@@ -405,6 +452,12 @@ export async function loadComparisonCore(
     ((leagueRows ?? [])[0] as { id: number; name: string | null } | undefined)?.name ?? null;
   const competitionLabel = getCompetitionLabel(leagueName);
 
+  const fixtureTeamInfoMap = await loadTeamInfoMap([fixture.home_team_id, fixture.away_team_id]);
+  const homeFixtureTeam = fixtureTeamInfoMap.get(fixture.home_team_id);
+  const awayFixtureTeam = fixtureTeamInfoMap.get(fixture.away_team_id);
+  const isNationalFixture =
+    fixture.league_id === 1 || Boolean(homeFixtureTeam?.national && awayFixtureTeam?.national);
+
   const homeScopeKey = scope === 'all' ? 'overall' : 'home';
   const awayScopeKey = scope === 'all' ? 'overall' : 'away';
 
@@ -417,9 +470,9 @@ export async function loadComparisonCore(
     homeTrends,
     awayTrends,
   ] = await Promise.all([
-    loadRecentFactsForTeam(fixture.home_team_id, fixture.league_id, fixture.season, fixture.date, scope, 'home'),
-    loadRecentFactsForTeam(fixture.away_team_id, fixture.league_id, fixture.season, fixture.date, scope, 'away'),
-    loadHeadToHeadFacts(fixture.home_team_id, fixture.away_team_id, fixture.league_id, fixture.season, fixture.date),
+    loadRecentFactsForTeam(fixture.home_team_id, fixture.league_id, fixture.season, fixture.date, scope, 'home', isNationalFixture),
+    loadRecentFactsForTeam(fixture.away_team_id, fixture.league_id, fixture.season, fixture.date, scope, 'away', isNationalFixture),
+    loadHeadToHeadFacts(fixture.home_team_id, fixture.away_team_id, fixture.league_id, fixture.season, fixture.date, isNationalFixture),
     loadTeamStatSummary(fixture.home_team_id, fixture.league_id, fixture.season, homeScopeKey),
     loadTeamStatSummary(fixture.away_team_id, fixture.league_id, fixture.season, awayScopeKey),
     loadTeamMarketTrends(fixture.home_team_id, fixture.league_id, fixture.season, homeScopeKey),
@@ -431,9 +484,18 @@ export async function loadComparisonCore(
   for (const row of awayFacts) opponentTeamIds.add(row.opponent_team_id);
 
   const knownTeamIds = new Set<number>([fixture.home_team_id, fixture.away_team_id, ...opponentTeamIds]);
-  const teamNameMap = await loadTeamNameMap([...knownTeamIds]);
-  const homeTeamName = teamNameMap.get(fixture.home_team_id) ?? '';
-  const awayTeamName = teamNameMap.get(fixture.away_team_id) ?? '';
+  const [teamInfoMap, leagueLabelMap] = await Promise.all([
+    loadTeamInfoMap([...knownTeamIds]),
+    loadLeagueLabelMap([
+      fixture.league_id,
+      ...homeFacts.map((row) => row.league_id),
+      ...awayFacts.map((row) => row.league_id),
+      ...h2hFacts.map((row) => row.league_id),
+    ]),
+  ]);
+  const homeTeamName = teamInfoMap.get(fixture.home_team_id)?.name ?? '';
+  const awayTeamName = teamInfoMap.get(fixture.away_team_id)?.name ?? '';
+  const labelForRow = (row: TeamFixtureFactsRow) => leagueLabelMap.get(row.league_id) ?? competitionLabel;
 
   const marketHits = marketKey
     ? await loadMarketHits(
@@ -450,8 +512,8 @@ export async function loadComparisonCore(
       row,
       fixture.home_team_id!,
       homeTeamName,
-      teamNameMap.get(row.opponent_team_id) ?? '',
-      competitionLabel,
+      teamInfoMap.get(row.opponent_team_id)?.name ?? '',
+      labelForRow(row),
       marketHits,
     ),
   );
@@ -461,8 +523,8 @@ export async function loadComparisonCore(
       row,
       fixture.away_team_id!,
       awayTeamName,
-      teamNameMap.get(row.opponent_team_id) ?? '',
-      competitionLabel,
+      teamInfoMap.get(row.opponent_team_id)?.name ?? '',
+      labelForRow(row),
       marketHits,
     ),
   );
@@ -473,7 +535,7 @@ export async function loadComparisonCore(
       fixture.home_team_id!,
       homeTeamName,
       awayTeamName,
-      competitionLabel,
+      labelForRow(row),
       marketHits,
     ),
   );

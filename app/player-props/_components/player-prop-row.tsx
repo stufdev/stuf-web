@@ -68,6 +68,12 @@ export function PlayerPropRow({ row, onEvidenceClick }: PlayerPropRowProps) {
       <td className="px-3 py-2.5 text-xs tabular-nums text-center">
         <span className="font-medium">{row.hits}</span>
         <span className="text-[var(--app-text-dim)]">/{row.sample}</span>
+        {row.highConfidence && (
+          <span
+            className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 align-middle"
+            title="Higher confidence (sample ≥ 15)"
+          />
+        )}
       </td>
 
       {/* Hit % bar */}

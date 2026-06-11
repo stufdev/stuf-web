@@ -155,19 +155,17 @@ export function PlayerPropsFilters({
           </select>
         </div>
 
-        {/* Min matches */}
+        {/* Min sample — raise-only main-ranking floor (P0 product standard) */}
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-[var(--app-text-dim)]">Min games</label>
+          <label className="text-xs text-[var(--app-text-dim)]">Min sample</label>
           <select
             className="rounded border border-[var(--app-border)] bg-[var(--app-panel)] px-2 py-1.5 text-xs text-[var(--app-text)]"
-            value={String(filters.minMatches)}
+            value={filters.minMatches >= 20 ? 20 : filters.minMatches >= 15 ? 15 : 10}
             onChange={(e) => onFiltersChange({ minMatches: Number(e.target.value) })}
           >
-            <option value="0">Any</option>
-            <option value="3">3+</option>
-            <option value="5">5+</option>
-            <option value="10">10+</option>
-            <option value="15">15+</option>
+            <option value={10}>≥ 10 (floor)</option>
+            <option value={15}>≥ 15</option>
+            <option value={20}>≥ 20</option>
           </select>
         </div>
 

@@ -1,7 +1,8 @@
 import 'server-only';
 
 import type { UpcomingFixtureView } from '@/lib/upcoming-fixtures';
-import { loadUpcomingFixtures } from './fixture-data';
+import { loadDecisionCardsByFixture, type DecisionCardView } from './decision-cards';
+import { loadRecentFixtures, loadUpcomingFixtures } from './fixture-data';
 import { getSupabaseAdmin } from './supabase-admin';
 
 type WindowOption = 'all' | number;
@@ -41,16 +42,21 @@ export type FixtureBoardRowStats = {
 };
 
 export type FixtureBoardSignalRating = {
-  label: 'Strong' | 'Watch' | 'Thin';
+  // How many of the 4 cells (home split, home all, away all, away split) cleared
+  // the chosen threshold, plus the average sample behind them. A plain factual
+  // count — no confidence label, no synthetic score.
   matchedCells: number;
   sample: number;
-  score: number;
 };
 
 export type FixtureBoardEntry = {
   fixture: UpcomingFixtureView;
   signal: FixtureBoardSignalRating;
   stats: FixtureBoardRowStats;
+  // Decision cards for the selected market on this fixture (from
+  // fixture_market_decision_cards). Empty when the odds pipeline has no
+  // cards for this fixture × market — missing stays missing.
+  decisionCards: DecisionCardView[];
 };
 
 function statKey(teamId: number, leagueId: number, season: number, scope: string, marketKey: string) {
@@ -98,43 +104,17 @@ function getRowStats(
 }
 
 function bestSignal(stats: FixtureBoardRowStats, threshold: number): FixtureBoardSignalRating {
-  const candidates = [
-    { value: stats.homeHome, weight: 1.25 },
-    { value: stats.homeAll, weight: 0.9 },
-    { value: stats.awayAll, weight: 0.9 },
-    { value: stats.awayAway, weight: 1.25 },
-  ].filter((item): item is { value: FixtureBoardStatValue; weight: number } => {
-    return !!item.value && item.value.percentage !== null && item.value.sample > 0;
-  });
+  const candidates = [stats.homeHome, stats.homeAll, stats.awayAll, stats.awayAway].filter(
+    (value): value is FixtureBoardStatValue => !!value && value.percentage !== null && value.sample > 0,
+  );
 
   if (candidates.length === 0) {
-    return { label: 'Thin', matchedCells: 0, sample: 0, score: 0 };
+    return { matchedCells: 0, sample: 0 };
   }
 
-  const weightedTotal = candidates.reduce((total, item) => {
-    const confidence = Math.min(item.value.sample / 12, 1);
-    return total + item.weight * confidence;
-  }, 0);
-  const weightedPercentage =
-    candidates.reduce((total, item) => {
-      const confidence = Math.min(item.value.sample / 12, 1);
-      return total + (item.value.percentage ?? 0) * item.weight * confidence;
-    }, 0) / weightedTotal;
-  const sample = Math.round(candidates.reduce((total, item) => total + item.value.sample, 0) / candidates.length);
-  const matchedCells = candidates.filter((item) => (item.value.percentage ?? 0) >= threshold).length;
-  const alignmentBonus = matchedCells >= 4 ? 10 : matchedCells === 3 ? 7 : matchedCells === 2 ? 4 : matchedCells === 1 ? 1 : 0;
-  const samplePenalty = sample < 4 ? 18 : sample < 8 ? 9 : 0;
-  const score = Math.max(0, Math.min(100, Math.round(weightedPercentage + alignmentBonus - samplePenalty)));
-
-  if (score >= threshold && matchedCells >= 2 && sample >= 8) {
-    return { label: 'Strong', matchedCells, sample, score };
-  }
-
-  if (score >= Math.max(45, threshold - 10) && sample >= 5) {
-    return { label: 'Watch', matchedCells, sample, score };
-  }
-
-  return { label: 'Thin', matchedCells, sample, score };
+  const sample = Math.round(candidates.reduce((total, value) => total + value.sample, 0) / candidates.length);
+  const matchedCells = candidates.filter((value) => (value.percentage ?? 0) >= threshold).length;
+  return { matchedCells, sample };
 }
 
 async function loadSeasonStats(fixtures: UpcomingFixtureView[], marketKey: string) {
@@ -192,25 +172,32 @@ async function loadWindowStats(fixtures: UpcomingFixtureView[], marketKey: strin
   return buildWindowStats((data ?? []) as MatchMarketRow[], windowSize);
 }
 
+export type FixturesBoardMode = 'upcoming' | 'recent';
+
 export async function loadFixturesBoard(
   days: number,
   marketKey: string,
   windowOption: WindowOption,
   threshold: number,
+  mode: FixturesBoardMode = 'upcoming',
 ) {
   if (!marketKey) {
     return [] as FixtureBoardEntry[];
   }
 
-  const fixtures = await loadUpcomingFixtures(days, 'fixtures');
+  const fixtures = mode === 'recent'
+    ? await loadRecentFixtures(days, 'fixtures')
+    : await loadUpcomingFixtures(days, 'fixtures');
   if (fixtures.length === 0) {
     return [];
   }
 
-  const statsByKey =
+  const [statsByKey, cardsByFixture] = await Promise.all([
     windowOption === 'all'
-      ? await loadSeasonStats(fixtures, marketKey)
-      : await loadWindowStats(fixtures, marketKey, windowOption);
+      ? loadSeasonStats(fixtures, marketKey)
+      : loadWindowStats(fixtures, marketKey, windowOption),
+    loadDecisionCardsByFixture(fixtures.map((fixture) => fixture.id), marketKey),
+  ]);
 
   return fixtures.map((fixture) => {
     const stats = getRowStats(fixture, statsByKey, marketKey);
@@ -219,6 +206,7 @@ export async function loadFixturesBoard(
       fixture,
       signal,
       stats,
+      decisionCards: cardsByFixture.get(fixture.id) ?? [],
     } satisfies FixtureBoardEntry;
   });
 }

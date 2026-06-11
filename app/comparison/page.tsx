@@ -4,11 +4,14 @@ import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { getDateKey, getDateWindowKeys } from '@/lib/date';
 import { fetchJson } from '@/lib/fetch-json';
-import { fetchUpcomingFixtures } from '@/lib/upcoming-fixtures';
+import { fetchRecentFixtures, fetchUpcomingFixtures } from '@/lib/upcoming-fixtures';
 import { StatePanel } from '../components/state-panel';
 import { useLanguage } from '../language-provider';
+import { useFixtureMode } from '../fixture-mode-provider';
+import { FixtureModeToggle } from '../_components/fixture-mode-toggle';
 import { ComparisonToolbar } from './_components/comparison-toolbar';
 import { HeadToHeadPanel } from './_components/head-to-head-panel';
+import { OddsPanel } from './_components/odds-panel';
 import { PlayerStatsPanel } from './_components/player-stats-panel';
 import { RefereeStatsPanel } from './_components/referee-stats-panel';
 import { ScopeToggle } from './_components/scope-toggle';
@@ -33,7 +36,7 @@ import type {
     UpcomingFixtureRecord,
 } from './types';
 
-const UPCOMING_DATE_WINDOW_DAYS = 6;
+const UPCOMING_DATE_WINDOW_DAYS = 14; // Wide enough for WC 2026 off-season gaps
 const EMPTY_COMPARISON_DATA: ComparisonCoreResponse = {
     awayMatches: [],
     awaySummary: null,
@@ -72,7 +75,7 @@ function getTabDescription(tab: ComparisonTabId, t: (value: string) => string) {
     if (tab === 'player-stats') return t('Player Stats compares player leaders for both teams in the selected league and scope.');
     if (tab === 'referee-stats') return t('Referee Stats compares the assigned referee with both teams using season averages and market tendencies.');
     if (tab === 'predictions') return t('Predictions will surface model signals and confidence once this module is ready.');
-    return t('Odds will compare bookmaker pricing and market context once this module is ready.');
+    return t('Odds shows bookmaker prices and the decision state of every tracked market for this fixture.');
 }
 
 function getSectionEyebrow(tab: ComparisonTabId, t: (value: string) => string) {
@@ -129,6 +132,38 @@ function useUpcomingFixtures(dateWindow: string[]) {
     }, [dateWindow, dateWindowKey]);
 
     return { errorMessage, fixtures, isLoading };
+}
+
+/** Loads recently-completed fixtures (FT/AET/PEN) once on mount for Season Review mode. */
+function useRecentFixtures(windowDays: number) {
+    const [fixtures, setFixtures] = useState<UpcomingFixtureRecord[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function load() {
+            setIsLoading(true);
+            try {
+                const data = await fetchRecentFixtures(windowDays);
+                if (cancelled) return;
+                setFixtures(data as UpcomingFixtureRecord[]);
+            } catch (error) {
+                if (cancelled) return;
+                console.error('Failed to load recent fixtures', error);
+                setFixtures([]);
+            } finally {
+                if (!cancelled) setIsLoading(false);
+            }
+        }
+
+        void load();
+        return () => { cancelled = true; };
+    // windowDays is a constant — run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return { fixtures, isLoading };
 }
 
 function useComparisonData(
@@ -190,6 +225,7 @@ function useComparisonData(
 
 export default function ComparisonPage() {
     const { locale, t } = useLanguage();
+    const { fixtureMode } = useFixtureMode();
     const [activeTab, setActiveTab] = useState<ComparisonTabId>('recent-matches');
     const [scope, setScope] = useState<ComparisonScope>('all');
     const [selectedDate, setSelectedDate] = useState('');
@@ -204,11 +240,27 @@ export default function ComparisonPage() {
     const [statisticsCategory, setStatisticsCategory] = useState<StatisticsCategoryId>('all');
 
     const upcomingDateWindow = useMemo(() => getDateWindowKeys(UPCOMING_DATE_WINDOW_DAYS), []);
-    const { errorMessage: fixturesErrorMessage, fixtures, isLoading: isFixturesLoading } = useUpcomingFixtures(upcomingDateWindow);
+    const { errorMessage: fixturesErrorMessage, fixtures: upcomingFixtures, isLoading: isUpcomingLoading } = useUpcomingFixtures(upcomingDateWindow);
+    const { fixtures: recentFixtures, isLoading: isRecentLoading } = useRecentFixtures(30);
+
+    // Use global fixture mode: upcoming = next 14 days (ascending), recent = last 30 days (descending).
+    const fixtures = useMemo(() => {
+        const source = fixtureMode === 'upcoming' ? upcomingFixtures : recentFixtures;
+        const sorted = [...source];
+        if (fixtureMode === 'upcoming') {
+            sorted.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        } else {
+            sorted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        }
+        return sorted;
+    }, [fixtureMode, upcomingFixtures, recentFixtures]);
+
+    const isFixturesLoading = fixtureMode === 'upcoming' ? isUpcomingLoading : isRecentLoading;
     const showRecentMatches = activeTab === 'recent-matches';
     const showStatistics = activeTab === 'statistics';
     const showPlayerStats = activeTab === 'player-stats';
     const showRefereeStats = activeTab === 'referee-stats';
+    const showOdds = activeTab === 'odds';
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -235,6 +287,9 @@ export default function ComparisonPage() {
         });
     }, []);
 
+    // No explicit reset needed when fixtureMode changes: `fixtures` recomputes from the
+    // new mode's pool, so `effectiveDate` falls back to upcomingDates[0] and `effectiveFixture`
+    // resolves to null when the previously-selected fixture is absent from the new date.
     const upcomingDates = useMemo(() => {
         return [...new Set(fixtures.map((fixture) => getDateKey(fixture.date)))];
     }, [fixtures]);
@@ -435,8 +490,13 @@ export default function ComparisonPage() {
 
                     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
                         <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Choose fixture')}</p>
-                            <p className="mt-1 text-sm text-[var(--app-text-soft)]">{t('Pick the match first. The rest of the page updates automatically.')}</p>
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Choose fixture')}</p>
+                                    <p className="mt-1 text-sm text-[var(--app-text-soft)]">{t('Pick the match first. The rest of the page updates automatically.')}</p>
+                                </div>
+                                <FixtureModeToggle />
+                            </div>
                             <div className="mt-4">
                                 <ComparisonToolbar
                                     groupedFixtures={groupedFixtures}
@@ -627,6 +687,14 @@ export default function ComparisonPage() {
                                 refereeName={effectiveRefereeName}
                                 scope={scope}
                                 season={effectiveSeason}
+                            />
+                        </div>
+                    ) : showOdds ? (
+                        <div className="flex flex-col gap-4">
+                            <OddsPanel
+                                awayTeamName={awayTeam?.name ?? t('Away team')}
+                                fixtureId={effectiveFixtureId}
+                                homeTeamName={homeTeam?.name ?? t('Home team')}
                             />
                         </div>
                     ) : (

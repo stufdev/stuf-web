@@ -32,10 +32,11 @@ function buildSearchParams(filters: PlayerPropFilters): URLSearchParams {
   params.set('propKey', filters.propKey);
   if (filters.scope !== 'overall') params.set('scope', filters.scope);
   if (filters.minPercentage > 0) params.set('minPercentage', String(filters.minPercentage));
-  if (filters.minMatches > 0) params.set('minMatches', String(filters.minMatches));
+  // Raise-only main floor: 10 is the default, only serialize when the user raises it.
+  if (filters.minMatches > 10) params.set('minMatches', String(filters.minMatches));
   if (filters.playerSearch.trim()) params.set('playerSearch', filters.playerSearch.trim());
-  // upcomingOnly defaults to true — only serialize when explicitly disabled
-  if (!filters.upcomingOnly) params.set('upcomingOnly', 'false');
+  // upcomingOnly defaults to false (Season Review). Only serialize when user enables the upcoming filter.
+  if (filters.upcomingOnly) params.set('upcomingOnly', 'true');
   return params;
 }
 
@@ -99,6 +100,40 @@ export function PlayerPropsClient({
     (ls) => ls.leagueId === filters.leagueId && ls.season === filters.season,
   );
 
+  function renderRankingTable(rows: PlayerPropRankingRow[], emerging = false) {
+    return (
+      <div
+        className={`overflow-x-auto rounded border border-[var(--app-border)]${emerging ? ' opacity-80' : ''}`}
+      >
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b border-[var(--app-border)] bg-[var(--app-panel)] text-xs text-[var(--app-text-dim)] text-left">
+              <th className="px-3 py-2 font-medium text-right">#</th>
+              <th className="px-3 py-2 font-medium">League</th>
+              <th className="px-3 py-2 font-medium">Player</th>
+              <th className="px-3 py-2 font-medium text-center">H/G</th>
+              <th className="px-3 py-2 font-medium">Hit %</th>
+              <th className="px-3 py-2 font-medium text-center">L5</th>
+              <th className="px-3 py-2 font-medium text-center">L10</th>
+              <th className="px-3 py-2 font-medium text-center">Streak</th>
+              <th className="px-3 py-2 font-medium">Next match</th>
+              <th className="px-3 py-2 font-medium text-right">Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <PlayerPropRow
+                key={`${row.playerId}-${row.teamId}-${row.propKey}-${row.scope}`}
+                row={row}
+                onEvidenceClick={setEvidenceTarget}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Page header */}
@@ -117,7 +152,10 @@ export function PlayerPropsClient({
             </div>
           </div>
           <div className="rounded border border-[var(--app-border)] px-3 py-2 text-xs font-semibold text-[var(--app-text-dim)]">
-            {result.rows.length} players
+            {result.rows.length} ranked
+            {result.emergingRows.length > 0 && (
+              <span className="ml-1 font-normal">· {result.emergingRows.length} emerging</span>
+            )}
           </div>
         </div>
       </section>
@@ -145,44 +183,39 @@ export function PlayerPropsClient({
           </div>
         )}
 
-        {result.rows.length === 0 && result.propAvailable && (
+        {result.rows.length === 0 && result.emergingRows.length === 0 && result.propAvailable && (
           <div className="border border-dashed border-[var(--app-border)] bg-[var(--app-panel)] p-8 text-center text-sm text-[var(--app-text-dim)]">
             {filters.upcomingOnly
-              ? 'No players with upcoming fixtures found. Switch to "All season" to see historical rankings.'
-              : (filters.minMatches > 0 || filters.minPercentage > 0)
-                ? 'No players found. Try relaxing the minimum games or percentage filters.'
-                : 'No players found. Run rebuild_player_prop_engine.py to populate data.'}
+              ? 'No players meet the ranking floor (sample ≥ 10) with upcoming fixtures. Switch to "All season" to see historical rankings.'
+              : (filters.minMatches > 10 || filters.minPercentage > 0)
+                ? 'No players found. Try lowering the minimum sample (back to ≥ 10) or percentage filter.'
+                : 'No players meet the ranking floor (sample ≥ 10) for this prop and scope.'}
           </div>
         )}
 
-        {result.rows.length > 0 && (
-          <div className="overflow-x-auto rounded border border-[var(--app-border)]">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-[var(--app-border)] bg-[var(--app-panel)] text-xs text-[var(--app-text-dim)] text-left">
-                  <th className="px-3 py-2 font-medium text-right">#</th>
-                  <th className="px-3 py-2 font-medium">League</th>
-                  <th className="px-3 py-2 font-medium">Player</th>
-                  <th className="px-3 py-2 font-medium text-center">H/G</th>
-                  <th className="px-3 py-2 font-medium">Hit %</th>
-                  <th className="px-3 py-2 font-medium text-center">L5</th>
-                  <th className="px-3 py-2 font-medium text-center">L10</th>
-                  <th className="px-3 py-2 font-medium text-center">Streak</th>
-                  <th className="px-3 py-2 font-medium">Next match</th>
-                  <th className="px-3 py-2 font-medium text-right">Evidence</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.rows.map((row) => (
-                  <PlayerPropRow
-                    key={`${row.playerId}-${row.propKey}-${row.scope}`}
-                    row={row}
-                    onEvidenceClick={setEvidenceTarget}
-                  />
-                ))}
-              </tbody>
-            </table>
+        {result.rows.length > 0 && renderRankingTable(result.rows)}
+
+        {result.rows.length === 0 && result.emergingRows.length > 0 && result.propAvailable && (
+          <div className="mb-2 border border-dashed border-[var(--app-border)] bg-[var(--app-panel)] p-4 text-sm text-[var(--app-text-dim)]">
+            No players meet the main-ranking floor (sample ≥ 10) for this prop and scope. Emerging
+            candidates only — treat as low confidence.
           </div>
+        )}
+
+        {result.emergingRows.length > 0 && (
+          <section className="mt-6">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-semibold text-[var(--app-text)]">Emerging / low sample</h2>
+              <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
+                sample 5–9 · low confidence
+              </span>
+            </div>
+            <p className="mb-2 text-xs text-[var(--app-text-dim)]">
+              Below the main-ranking floor (sample ≥ 10). Shown for visibility only — not a confirmed
+              signal.
+            </p>
+            {renderRankingTable(result.emergingRows, true)}
+          </section>
         )}
       </section>
 

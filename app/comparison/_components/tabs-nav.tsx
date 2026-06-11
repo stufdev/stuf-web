@@ -20,7 +20,7 @@ export const COMPARISON_TABS: Array<{
     { id: 'player-stats', label: 'Player Stats', available: true },
     { id: 'referee-stats', label: 'Referee Stats', available: true },
     { id: 'statistics', label: 'Statistics', available: true },
-    { id: 'odds', label: 'Odds', available: false },
+    { id: 'odds', label: 'Odds', available: true },
   ];
 
 type TabsNavProps = {

@@ -3,6 +3,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { addDays, formatDateKey, getDateRange } from '@/lib/date';
 import { getSupabaseAdmin } from './supabase-admin';
+import { EMERGING_MIN_SAMPLE, MAIN_RANKING_MIN_SAMPLE, parseMainRankingFloor } from './sample-bands';
 
 export type CornerQuickScope = 'overall' | 'home' | 'away';
 export type CornerQuickPeriodGroup = 'full' | 'by_half';
@@ -101,7 +102,10 @@ export type CornerQuickResult = {
   marketKey: string;
   marketLabel: string;
   marketAvailable: boolean;
+  // Main ranking: sample ≥ the (raise-only) floor, ≥ 10.
   columns: CornerQuickColumn[];
+  // Emerging / low sample: sample 5–9, split by scope. Never mixed into `columns`.
+  emergingColumns: CornerQuickColumn[];
 };
 
 export type CornerQuickTiming = {
@@ -370,7 +374,8 @@ export function parseCornerQuickFilters(
     minOdds: minOdds !== null && minOdds > 0 ? minOdds : null,
     formWindow: parseFormWindow(searchParams?.formWindow),
     fixtureFilter: parseFixtureFilter(searchParams?.fixtureFilter),
-    minSample: (parseInteger(searchParams?.minSample) ?? 0) >= 4 ? 4 : 0,
+    // P0 raise-only main-ranking floor: 10 (default) / 15 / 20. Never below 10.
+    minSample: parseMainRankingFloor(parseInteger(searchParams?.minSample)),
   };
 }
 
@@ -1035,6 +1040,7 @@ export async function loadCornerQuickScannerWithTiming(
         marketLabel,
         marketAvailable: marketDefinition?.is_active === true,
         columns: SCOPES.map((scope) => ({ scope, title: scopeToTitle(scope), rows: [] })),
+        emergingColumns: SCOPES.map((scope) => ({ scope, title: scopeToTitle(scope), rows: [] })),
       },
       timing: {
         dbMs,
@@ -1046,7 +1052,10 @@ export async function loadCornerQuickScannerWithTiming(
   }
 
   const normalizedSearch = filters.teamSearch.trim().toLowerCase();
-  const columns: CornerQuickColumn[] = SCOPES.map((scope) => {
+  // Candidate rows per scope, banded: keep only sample ≥ 5 (drop the noise band),
+  // then partition into main (≥ floor) and emerging (5–9) below.
+  const candidatesByScope = new Map<CornerQuickScope, CornerQuickRow[]>();
+  for (const scope of SCOPES) {
     const rows = snapshotRows
       .filter((row) => row.scope === scope)
       .flatMap((row) => {
@@ -1055,7 +1064,7 @@ export async function loadCornerQuickScannerWithTiming(
         }
 
         const metric = metricFromQuickSnapshot(row, filters.formWindow);
-        if (metric.sample < filters.minSample) {
+        if (metric.sample < EMERGING_MIN_SAMPLE) {
           return [];
         }
 
@@ -1107,9 +1116,23 @@ export async function loadCornerQuickScannerWithTiming(
         right.metric.hits - left.metric.hits ||
         right.metric.sample - left.metric.sample ||
         left.teamName.localeCompare(right.teamName)
-      ))
-      .slice(0, QUICK_RESULT_LIMIT_PER_SCOPE);
+      ));
 
+    candidatesByScope.set(scope, rows);
+  }
+
+  // Main ranking columns: sample ≥ the raise-only floor (≥ 10).
+  const columns: CornerQuickColumn[] = SCOPES.map((scope) => {
+    const rows = (candidatesByScope.get(scope) ?? [])
+      .filter((row) => row.metric.sample >= filters.minSample)
+      .slice(0, QUICK_RESULT_LIMIT_PER_SCOPE);
+    return { scope, title: scopeToTitle(scope), rows };
+  });
+  // Emerging columns: fixed 5–9 band, independent of the user-raised floor.
+  const emergingColumns: CornerQuickColumn[] = SCOPES.map((scope) => {
+    const rows = (candidatesByScope.get(scope) ?? [])
+      .filter((row) => row.metric.sample >= EMERGING_MIN_SAMPLE && row.metric.sample < MAIN_RANKING_MIN_SAMPLE)
+      .slice(0, QUICK_RESULT_LIMIT_PER_SCOPE);
     return { scope, title: scopeToTitle(scope), rows };
   });
 
@@ -1119,6 +1142,7 @@ export async function loadCornerQuickScannerWithTiming(
       marketLabel,
       marketAvailable: marketDefinition?.is_active === true,
       columns,
+      emergingColumns,
     },
     timing: {
       dbMs,
