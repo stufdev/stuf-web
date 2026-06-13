@@ -45,7 +45,7 @@ const TABS: Array<{ id: WorldCupTab; label: string; icon?: React.ReactNode }> = 
   { id: 'fixtures', label: 'Fixtures' },
   { id: 'table', label: 'Table & Averages' },
   { id: 'top-players', label: 'Top Players' },
-  { id: 'player-streaks', label: 'Streaks' },
+  { id: 'player-streaks', label: 'Player Streaks' },
   { id: 'player-props', label: 'Player Props' },
 ];
 
@@ -1206,50 +1206,7 @@ function PlayerStreaksSection({ initialStreaks }: { initialStreaks: WcPlayerStre
   );
 }
 
-// ── Prop link cards ───────────────────────────────────────────────────────────
-function PropLinkCards() {
-  const rows = [
-    {
-      href: '/player-props?leagueId=1&season=2026&upcomingOnly=false',
-      label: 'All-season player props',
-      desc: 'Prop hit-rates across the full evidence pool.',
-      badge: 'Full season',
-    },
-    {
-      href: '/player-props?leagueId=1&season=2026&upcomingOnly=true',
-      label: 'Upcoming fixture props',
-      desc: 'Props for players in upcoming WC fixtures.',
-      badge: 'Upcoming',
-    },
-  ];
 
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {rows.map((row) => (
-        <Link key={row.href} href={row.href} prefetch={false} className="group/card block">
-          <div className="overflow-hidden rounded-xl border border-border/60 bg-background transition-all duration-150 hover:border-border hover:shadow-sm">
-            <div className="flex items-start justify-between gap-3 p-4">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-foreground">{row.label}</span>
-                  <Badge
-                    variant="outline"
-                    className="rounded-md border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-                  >
-                    {row.badge}
-                  </Badge>
-                </div>
-                <p className="text-xs leading-5 text-muted-foreground">{row.desc}</p>
-              </div>
-              <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover/card:translate-x-0.5 group-hover/card:-translate-y-0.5 group-hover/card:text-foreground" />
-            </div>
-            <div className="h-px bg-gradient-to-r from-primary/20 via-primary/5 to-transparent" />
-          </div>
-        </Link>
-      ))}
-    </div>
-  );
-}
 
 // ── Page ────────────────────────────────────────────────────────────────────────
 export function WorldCupHubClient({
@@ -1372,7 +1329,10 @@ export function WorldCupHubClient({
         {(showAll || activeTab === 'player-props') && (
           <section id="player-props" className={cn(showAll && 'py-10')}>
             <SectionHead eyebrow="Player props" title="Prop percentages" />
-            <PropLinkCards />
+            <div className="flex h-32 items-center justify-center rounded-xl border border-border/60 bg-muted/10 text-sm text-muted-foreground">
+              {/* Prop link cards han sido ocultados temporalmente por diseño. */}
+              Section is currently being refactored.
+            </div>
           </section>
         )}
       </div>

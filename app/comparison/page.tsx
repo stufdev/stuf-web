@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, BarChart3, CalendarDays, Clock3, Goal, Sparkles } from 'lucide-react';
+import { AlertCircle, BarChart3, CalendarDays, Clock3, Goal, Sparkles, Send } from 'lucide-react';
 import { getDateKey, getDateWindowKeys } from '@/lib/date';
 import { fetchJson } from '@/lib/fetch-json';
 import { fetchRecentFixtures, fetchUpcomingFixtures } from '@/lib/upcoming-fixtures';
@@ -776,21 +776,18 @@ export default function ComparisonPage() {
                             />
                         </div>
                     ) : showPredictions ? (
-                        <Card className="items-center rounded-[5px] border-border/70 py-8 text-center shadow-none">
-                            <CardHeader className="items-center gap-2">
-                                <CardTitle className="text-xl">{t('AI Predictions Engine')}</CardTitle>
-                                <CardDescription className="max-w-xl text-sm">
-                                    {t('Join our Telegram channel for early access to our proprietary match prediction models and betting signals.')}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <Button asChild size="sm">
-                                    <a href="https://t.me/rasermoney" rel="noopener noreferrer" target="_blank">
-                                        {t('Join @rasermoney on Telegram')}
-                                    </a>
-                                </Button>
-                            </CardContent>
-                        </Card>
+                        <div className="flex flex-col items-center justify-center rounded-md border border-border/70 bg-muted/10 py-12 px-4 text-center shadow-sm">
+                            <Send className="mb-4 size-10 text-foreground" />
+                            <h2 className="mb-2 text-xl font-bold text-foreground">{t('Predictions')}</h2>
+                            <p className="mb-6 max-w-sm text-[13px] text-muted-foreground">
+                                {t('Contact us to get daily predictions and signals.')}
+                            </p>
+                            <Button asChild size="default" className="font-bold">
+                                <a href="https://t.me/rasermoney" rel="noopener noreferrer" target="_blank">
+                                    {t('Contact @rasermoney')}
+                                </a>
+                            </Button>
+                        </div>
                     ) : showOdds ? (
                         <div className="flex flex-col gap-4">
                             <OddsPanel
