@@ -5,6 +5,7 @@ export const LANGUAGE_STORAGE_KEY = 'stuf-language';
 const SPANISH_TRANSLATIONS: Record<string, string> = {
   Analytics: 'Analítica',
   'All competitions': 'Todas las competiciones',
+  'All leagues': 'Todas las ligas',
   'All matches': 'Todos los partidos',
   'All team matches': 'Todos los partidos del equipo',
   All: 'Todo',
@@ -38,6 +39,9 @@ const SPANISH_TRANSLATIONS: Record<string, string> = {
   Comparison: 'Comparación',
   'Core workflow': 'Flujo principal',
   'Current module': 'Módulo actual',
+  'Current market line driving the historical board.':
+    'Línea de mercado actual que impulsa el tablero histórico.',
+  'Active league': 'Liga activa',
   'Choose fixture': 'Elegir partido',
   'Conceded': 'Encajados',
   'Corners': 'Córners',
@@ -274,6 +278,7 @@ const SPANISH_TRANSLATIONS: Record<string, string> = {
   'Home streaks': 'Rachas de local',
   'Away streaks': 'Rachas de visitante',
   'Search/Filter': 'Búsqueda / filtro',
+  'Hide fixtures below threshold': 'Ocultar partidos por debajo del umbral',
   'Select Country': 'Seleccionar país',
   'Select League': 'Seleccionar liga',
   'Search For Team': 'Buscar equipo',
@@ -288,7 +293,9 @@ const SPANISH_TRANSLATIONS: Record<string, string> = {
   'KO': 'Hora',
   'Away Team': 'Equipo visitante',
   Signal: 'Señal',
+  Signals: 'Señales',
   Action: 'Acción',
+  Shown: 'Mostrados',
   Strong: 'Fuerte',
   Watch: 'Vigilar',
   Thin: 'Débil',
@@ -297,6 +304,11 @@ const SPANISH_TRANSLATIONS: Record<string, string> = {
   'Any sample': 'Cualquier muestra',
   'Minimum odds': 'Cuota mínima',
   'Any odds': 'Cualquier cuota',
+  Split: 'Split',
+  Cleared: 'Superadas',
+  'Kickoff & price': 'Hora y cuota',
+  'Reference prices': 'Cuotas de referencia',
+  'No prices': 'Sin cuotas',
   matches: 'partidos',
   // Decision cards (Odds tab + Scanner price badges)
   'Pre-match': 'Pre-partido',
@@ -342,10 +354,40 @@ const SPANISH_TRANSLATIONS: Record<string, string> = {
   'Use Comparison to validate teams, player context and referee context before acting.':
     'Usa Comparison para validar equipos, contexto de jugadores y contexto arbitral antes de actuar.',
   'Fixtures scheduled inside the current scan horizon.': 'Partidos programados dentro del horizonte actual de escaneo.',
+  'League visibility across the active signal board.':
+    'Cobertura de ligas dentro del tablero de señales activo.',
   'Matches that passed the active filters and sample rules.': 'Partidos que superaron los filtros activos y las reglas de muestra.',
   'Strong signals': 'Señales fuertes',
   'Average signal': 'Señal promedio',
+  'Average number of ranked signals across the visible fixtures.':
+    'Promedio de señales clasificadas entre los partidos visibles.',
   'Average confidence score across the visible board.': 'Puntuación promedio de confianza en el tablero visible.',
+  'Visible leagues': 'Ligas visibles',
+  'Signals per fixture': 'Señales por partido',
+  Filters: 'Filtros',
+  'More signals': 'Más señales',
+  'Home form': 'Forma local',
+  'Away form': 'Forma visitante',
+  'Market prices': 'Precios de mercado',
+  'Signal fit': 'Ajuste de señal',
+  'Advanced filters': 'Filtros avanzados',
+  Sample: 'Muestra',
+  'Hide below': 'Ocultar bajo',
+  'Active competition scope for the visible cards.':
+    'Alcance competitivo activo para las tarjetas visibles.',
+  'Current market line': 'Línea de mercado actual',
+  'Active market line': 'Línea de mercado activa',
+  'Historical rates describe trend fit, not certainty.':
+    'Las tasas históricas describen ajuste de tendencia, no certeza.',
+  'Refine results': 'Refinar resultados',
+  'Upcoming schedule': 'Calendario próximo',
+  'Match Intelligence': 'Inteligencia de partidos',
+  'Market Scanner': 'Escáner de mercados',
+  'Rank the next fixtures by signal quality, team context and market fit.':
+    'Ordena los próximos partidos por calidad de señal, contexto de equipo y ajuste de mercado.',
+  'Signal board is empty for this window.': 'El panel de señales está vacío para esta ventana.',
+  'Adjust the filters or expand the scan horizon.':
+    'Ajusta los filtros o amplía el horizonte de escaneo.',
   'Open the full match workspace to inspect comparison, trends and referee context.':
     'Abre el espacio completo del partido para revisar comparación, tendencias y contexto arbitral.',
   'Board context': 'Contexto del tablero',

@@ -25,6 +25,13 @@ export type WorldCupTeam = {
   name: string;
 };
 
+export type FixtureMatchOdds = {
+  homePrice: number | null;
+  drawPrice: number | null;
+  awayPrice: number | null;
+  bookmaker: string | null;
+};
+
 export type WorldCupFixture = {
   awayGoals: number | null;
   awayTeam: WorldCupTeam;
@@ -32,9 +39,34 @@ export type WorldCupFixture = {
   homeGoals: number | null;
   homeTeam: WorldCupTeam;
   id: number;
+  matchOdds: FixtureMatchOdds | null;
   refereeName: string | null;
   roundName: string | null;
   statusShort: string | null;
+};
+
+export type WcPlayerStreakRow = {
+  currentStreak: number;
+  hits: number;
+  last5Hits: number | null;
+  last5Sample: number | null;
+  longestStreak: number;
+  nextFixtureDate: string | null;
+  nextFixtureId: number | null;
+  nextOpponentName: string | null;
+  nextVenueScope: 'home' | 'away' | null;
+  percentage: number | null;
+  playerId: number;
+  playerName: string | null;
+  propKey: string;
+  propLabel: string;
+  sample: number;
+  team: WorldCupTeam;
+};
+
+export type WcPlayerStreaksResult = {
+  minStreak: number;
+  rows: WcPlayerStreakRow[];
 };
 
 export type WorldCupStandingRow = {
@@ -341,6 +373,7 @@ export async function loadWorldCupFixtures(): Promise<WorldCupFixture[]> {
       homeGoals: fixture.home_goals,
       homeTeam: toTeam(homeTeam, fixture.home_team_id),
       id: fixture.id,
+      matchOdds: null,
       refereeName: fixture.referee_name_raw,
       roundName: fixture.round_name,
       statusShort: fixture.status_short,
@@ -606,6 +639,129 @@ function playerMetricTotal(row: PlayerSeasonRow, metric: WorldCupPlayerMetric) {
     default:
       return row.goals;
   }
+}
+
+export async function loadWorldCupFixtureOdds(fixtureIds: number[]): Promise<Map<number, FixtureMatchOdds>> {
+  const map = new Map<number, FixtureMatchOdds>();
+  if (fixtureIds.length === 0) return map;
+
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data, error } = await supabaseAdmin
+    .from('fixture_market_decision_cards')
+    .select('fixture_id, market_key, selection, reference_price, reference_bookmaker')
+    .in('fixture_id', fixtureIds)
+    .in('market_key', ['WIN', 'DRAW', 'LOSS'])
+    .eq('market_scope', 'prematch')
+    .not('reference_price', 'is', null);
+
+  if (error) {
+    throw new Error(`Failed to load fixture odds: ${error.message}`);
+  }
+
+  type OddsRow = {
+    fixture_id: number;
+    market_key: string;
+    selection: string;
+    reference_price: number | string | null;
+    reference_bookmaker: string | null;
+  };
+
+  for (const row of (data ?? []) as OddsRow[]) {
+    const existing = map.get(row.fixture_id) ?? {
+      homePrice: null,
+      drawPrice: null,
+      awayPrice: null,
+      bookmaker: null,
+    };
+    const price = row.reference_price == null ? null : Number(row.reference_price);
+    if (row.market_key === 'WIN' && row.selection === 'home') {
+      existing.homePrice = price;
+      existing.bookmaker ??= row.reference_bookmaker;
+    } else if (row.market_key === 'DRAW' && row.selection === 'draw') {
+      existing.drawPrice = price;
+      existing.bookmaker ??= row.reference_bookmaker;
+    } else if (row.market_key === 'LOSS' && row.selection === 'away') {
+      existing.awayPrice = price;
+      existing.bookmaker ??= row.reference_bookmaker;
+    }
+    map.set(row.fixture_id, existing);
+  }
+
+  return map;
+}
+
+export async function loadWorldCupPlayerStreaks(minStreak = 2): Promise<WcPlayerStreaksResult> {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  const [rankingsResult, defsResult] = await Promise.all([
+    supabaseAdmin
+      .from('player_prop_rankings')
+      .select(
+        'prop_key, player_id, player_name, team_id, team_name, team_logo_url, ' +
+        'current_streak, longest_streak, sample, hits, percentage, ' +
+        'last_5_sample, last_5_hits, next_fixture_id, next_fixture_date, ' +
+        'next_opponent_name, next_venue_scope',
+      )
+      .eq('league_id', WORLD_CUP_LEAGUE_ID)
+      .eq('season', WORLD_CUP_SEASON)
+      .eq('scope', 'overall')
+      .gte('current_streak', minStreak)
+      .order('current_streak', { ascending: false })
+      .limit(200),
+    supabaseAdmin
+      .from('player_prop_definitions')
+      .select('key, label')
+      .eq('is_active', true),
+  ]);
+
+  if (rankingsResult.error) {
+    throw new Error(`Failed to load player streaks: ${rankingsResult.error.message}`);
+  }
+
+  type RawStreakRow = {
+    prop_key: string;
+    player_id: number;
+    player_name: string | null;
+    team_id: number;
+    team_name: string;
+    team_logo_url: string | null;
+    current_streak: number;
+    longest_streak: number;
+    sample: number;
+    hits: number;
+    percentage: number | string | null;
+    last_5_sample: number | null;
+    last_5_hits: number | null;
+    next_fixture_id: number | null;
+    next_fixture_date: string | null;
+    next_opponent_name: string | null;
+    next_venue_scope: 'home' | 'away' | null;
+  };
+
+  const propLabelMap = new Map<string, string>(
+    ((defsResult.data ?? []) as { key: string; label: string }[]).map((d) => [d.key, d.label]),
+  );
+
+  const rows: WcPlayerStreakRow[] = ((rankingsResult.data ?? []) as RawStreakRow[]).map((row) => ({
+    currentStreak: row.current_streak,
+    hits: row.hits,
+    last5Hits: row.last_5_hits,
+    last5Sample: row.last_5_sample,
+    longestStreak: row.longest_streak,
+    nextFixtureDate: row.next_fixture_date,
+    nextFixtureId: row.next_fixture_id,
+    nextOpponentName: row.next_opponent_name,
+    nextVenueScope: row.next_venue_scope,
+    percentage: row.percentage == null ? null : Number(row.percentage),
+    playerId: row.player_id,
+    playerName: row.player_name,
+    propKey: row.prop_key,
+    propLabel: propLabelMap.get(row.prop_key) ?? row.prop_key,
+    sample: row.sample,
+    team: { id: row.team_id, logoUrl: row.team_logo_url, name: row.team_name },
+  }));
+
+  return { minStreak, rows };
 }
 
 function playerMetricPer90(row: PlayerSeasonRow, metric: WorldCupPlayerMetric) {

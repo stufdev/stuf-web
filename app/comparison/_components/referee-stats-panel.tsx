@@ -4,6 +4,22 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { fetchJson } from '@/lib/fetch-json';
 import { useLanguage } from '../../language-provider';
 import { getTeamName } from '../helpers';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type {
   ComparisonScope,
   MarketDefinitionRelation,
@@ -247,7 +263,7 @@ function MarketValueCell({ record }: { record: RefereeMarketStatsRecord | TeamMa
   const { language } = useLanguage();
 
   if (!record || record.sample <= 0) {
-    return <span className="text-xs text-[var(--app-text-dim)]">-</span>;
+    return <span className="text-[12px] font-bold text-muted-foreground">-</span>;
   }
 
   const width = `${Math.max(0, Math.min(100, record.percentage))}%`;
@@ -260,41 +276,41 @@ function MarketValueCell({ record }: { record: RefereeMarketStatsRecord | TeamMa
 
   return (
     <div className="min-w-[120px]">
-      <div className="relative h-7 overflow-hidden rounded-[5px] border border-[var(--app-border)] bg-[var(--app-canvas)]">
-        <div className="absolute inset-y-0 left-0 bg-[#86c7f7]" style={{ width }} />
-        <span className="relative z-10 flex h-full items-center px-2 text-xs font-semibold text-[var(--app-text)]">
+      <div className="relative h-6 overflow-hidden rounded-[4px] border border-border/50 bg-background/50">
+        <div className="absolute inset-y-0 left-0 bg-primary" style={{ width }} />
+        <span className={`relative z-10 flex h-full items-center px-2 text-[11px] font-bold ${record.percentage >= 50 ? 'text-primary-foreground' : 'text-foreground'}`}>
           {formatPercent(record.percentage)}
         </span>
       </div>
-      {streak ? <p className="mt-0.5 text-[12px] text-[var(--app-text-dim)]">{streak}</p> : null}
+      {streak ? <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{streak}</p> : null}
     </div>
   );
 }
 
 function AverageValueCell({ value, maxValue }: { value: number | null; maxValue: number | null }) {
-  if (value == null) return <td className="border border-[var(--app-border)] px-2 py-1.5" />;
+  if (value == null) return <TableCell className="border-l border-border/50 px-2 py-1.5" />;
 
   const isMax = maxValue != null && value === maxValue;
   return (
-      <td
-      className={`border border-[var(--app-border)] px-2 py-1.5 text-center text-xs ${isMax ? 'bg-emerald-500/10 font-semibold text-[var(--app-text)]' : 'text-[var(--app-text-dim)]'
+      <TableCell
+      className={`border-l border-border/50 px-2 py-1.5 text-center text-[12px] tabular-nums ${isMax ? 'bg-emerald-500/10 font-bold text-foreground' : 'font-semibold text-muted-foreground'
         }`}
       >
         {formatDecimal(value)}
-    </td>
+    </TableCell>
   );
 }
 
 function SectionRow({ label }: { label: string }) {
   return (
-    <tr>
-      <td
-        className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-1.5 text-xs font-semibold text-[var(--app-text)]"
+    <TableRow className="border-t border-border/50 hover:bg-transparent">
+      <TableCell
+        className="bg-muted/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-foreground"
         colSpan={4}
       >
         {label}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -302,20 +318,20 @@ function MatchCountRow({ refereeMatches, homeMatches, awayMatches }: { refereeMa
   const { t } = useLanguage();
 
     return (
-      <tr>
-      <th className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-1.5 text-left text-xs font-semibold text-[var(--app-text)]">
+      <TableRow className="border-border/50 hover:bg-transparent">
+      <TableCell className="bg-muted/10 px-3 py-1.5 text-left text-[11px] font-bold uppercase tracking-widest text-foreground">
           {t('Matches')}
-        </th>
-      <td className="border border-[var(--app-border)] px-2 py-1.5 text-center text-xs text-[var(--app-text-dim)]">
+        </TableCell>
+      <TableCell className="border-l border-border/50 px-2 py-1.5 text-center text-[12px] font-bold tabular-nums text-muted-foreground">
           {refereeMatches || '-'}
-        </td>
-      <td className="border border-[var(--app-border)] px-2 py-1.5 text-center text-xs text-[var(--app-text-dim)]">
+        </TableCell>
+      <TableCell className="border-l border-border/50 px-2 py-1.5 text-center text-[12px] font-bold tabular-nums text-muted-foreground">
           {homeMatches ?? '-'}
-        </td>
-      <td className="border border-[var(--app-border)] px-2 py-1.5 text-center text-xs text-[var(--app-text-dim)]">
+        </TableCell>
+      <TableCell className="border-l border-border/50 px-2 py-1.5 text-center text-[12px] font-bold tabular-nums text-muted-foreground">
           {awayMatches ?? '-'}
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
   );
 }
 
@@ -326,14 +342,14 @@ function AverageDataRow({ label, values }: { label: string; values: [number | nu
   );
 
   return (
-    <tr>
-      <th className="border border-[var(--app-border)] px-2 py-1.5 text-left text-xs font-medium text-[var(--app-text-dim)]">
+    <TableRow className="border-border/50 hover:bg-muted/30">
+      <TableCell className="px-3 py-1.5 text-left text-[11px] font-bold text-muted-foreground">
         {label}
-      </th>
+      </TableCell>
       {values.map((value, index) => (
         <AverageValueCell key={`${label}-${index}`} maxValue={maxValue} value={value} />
       ))}
-    </tr>
+    </TableRow>
   );
 }
 
@@ -360,33 +376,34 @@ function RefereeAverageSummary({
 
   return (
     <section className="flex flex-col">
-      <div className="border-b border-[var(--app-border)] bg-[var(--app-canvas)] px-4 py-3 text-center">
-        <h3 className="text-\[11px\] font-semibold text-[var(--app-text)]">{t('Season average stats in league')}</h3>
+      <div className="border-b border-border/50 bg-muted/10 px-4 py-2 text-center">
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{t('Season average stats in league')}</h3>
       </div>
 
       <div className="flex justify-center px-4 py-4">
-        <div className="rounded-[5px] bg-[var(--app-panel-muted)] px-3 py-1 text-xs font-semibold text-[var(--app-text-dim)]">
+        <div className="rounded-md bg-muted/20 border border-border/50 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
           {t(getScopeLabel(scope))}
         </div>
       </div>
 
       <div className="overflow-x-auto p-4 pt-0">
-        <table className="w-full min-w-[560px] border-collapse">
-          <thead>
-            <tr>
-              <th className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-2 text-left text-xs text-[var(--app-text-dim)]" />
-              <th className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-2 text-center text-xs font-semibold text-[var(--app-text)]">
+        <div className="rounded-md border border-border/50 bg-background shadow-sm">
+        <Table className="min-w-[560px]">
+          <TableHeader className="bg-muted/20">
+            <TableRow className="border-border/50 hover:bg-transparent">
+              <TableHead className="h-8 px-2 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground" />
+              <TableHead className="border-l border-border/50 h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-foreground">
                 {t('Referee')} ({refereeName})
-              </th>
-              <th className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-2 text-center text-xs font-semibold text-[var(--app-text)]">
+              </TableHead>
+              <TableHead className="border-l border-border/50 h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-foreground">
                 {getScopedTeamLabel(homeTeamName, t('Home').toLowerCase(), scope)}
-              </th>
-              <th className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-2 text-center text-xs font-semibold text-[var(--app-text)]">
+              </TableHead>
+              <TableHead className="border-l border-border/50 h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-foreground">
                 {getScopedTeamLabel(awayTeamName, t('Away').toLowerCase(), scope)}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             <MatchCountRow
               awayMatches={awaySummary?.matches_played ?? null}
               homeMatches={homeSummary?.matches_played ?? null}
@@ -412,8 +429,9 @@ function RefereeAverageSummary({
             />
             <AverageDataRow label={t('For')} values={[null, homeSummary?.avg_cards_for ?? null, awaySummary?.avg_cards_for ?? null]} />
             <AverageDataRow label={t('Against')} values={[null, homeSummary?.avg_cards_against ?? null, awaySummary?.avg_cards_against ?? null]} />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
+        </div>
       </div>
     </section>
   );
@@ -443,34 +461,35 @@ function RefereeMarketComparison({
 
   return (
     <section className="flex flex-col">
-      <div className="border-b border-[var(--app-border)] bg-[var(--app-canvas)] px-4 py-3 text-center">
-        <h3 className="text-\[11px\] font-semibold text-[var(--app-text)]">{t('Compare Referee and Team season market statistics')}</h3>
+      <div className="border-b border-border/50 bg-muted/10 px-4 py-2 text-center">
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{t('Compare Referee and Team season market statistics')}</h3>
       </div>
 
       <div className="flex flex-col gap-2 px-4 py-4">
-        <div className="mx-auto rounded-[5px] bg-[var(--app-panel-muted)] px-3 py-1 text-xs font-semibold text-[var(--app-text-dim)]">
+        <div className="mx-auto rounded-md bg-muted/20 border border-border/50 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
           {t(getScopeLabel(scope))}
         </div>
-        <p className="text-\[11px\] text-[var(--app-text-dim)]">{t('* streak text = current match streak')}</p>
+        <p className="text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('* streak text = current match streak')}</p>
       </div>
 
       <div className="overflow-x-auto px-4 pb-4">
-        <table className="w-full min-w-[780px] border-collapse">
-          <thead>
-            <tr>
-              <th className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-2 text-left text-xs text-[var(--app-text-dim)]" />
-              <th className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-2 text-center text-xs font-semibold text-[var(--app-text)]">
+        <div className="rounded-md border border-border/50 bg-background shadow-sm">
+        <Table className="min-w-[780px]">
+          <TableHeader className="bg-muted/20">
+            <TableRow className="border-border/50 hover:bg-transparent">
+              <TableHead className="h-8 px-2 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground" />
+              <TableHead className="border-l border-border/50 h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-foreground">
                 {t('Referee')} ({refereeName})
-              </th>
-              <th className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-2 text-center text-xs font-semibold text-[var(--app-text)]">
+              </TableHead>
+              <TableHead className="border-l border-border/50 h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-foreground">
                 {getScopedTeamLabel(homeTeamName, t('Home').toLowerCase(), scope)}
-              </th>
-              <th className="border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-2 text-center text-xs font-semibold text-[var(--app-text)]">
+              </TableHead>
+              <TableHead className="border-l border-border/50 h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-foreground">
                 {getScopedTeamLabel(awayTeamName, t('Away').toLowerCase(), scope)}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             <MatchCountRow
               awayMatches={awayTrends[0]?.sample ?? null}
               homeMatches={homeTrends[0]?.sample ?? null}
@@ -483,26 +502,27 @@ function RefereeMarketComparison({
                   const refereeRecord = refereeByKey[marketKey] ?? null;
                   const label = getDefinition(refereeRecord)?.label ?? fallbackLabel;
                   return (
-                    <tr key={marketKey}>
-                      <th className="border border-[var(--app-border)] px-2 py-2 text-left text-xs font-medium text-[var(--app-text-dim)]">
+                    <TableRow key={marketKey} className="border-border/50 hover:bg-muted/30">
+                      <TableCell className="px-3 py-1.5 text-left text-[11px] font-bold text-muted-foreground">
                         {t(label.replace(' Booking Points', '').replace(' Total Cards', ''))}
-                      </th>
-                      <td className="border border-[var(--app-border)] px-2 py-2">
+                      </TableCell>
+                      <TableCell className="border-l border-border/50 px-2 py-1.5">
                         <MarketValueCell record={refereeRecord} />
-                      </td>
-                      <td className="border border-[var(--app-border)] px-2 py-2">
+                      </TableCell>
+                      <TableCell className="border-l border-border/50 px-2 py-1.5">
                         <MarketValueCell record={homeByKey[marketKey] ?? null} />
-                      </td>
-                      <td className="border border-[var(--app-border)] px-2 py-2">
+                      </TableCell>
+                      <TableCell className="border-l border-border/50 px-2 py-1.5">
                         <MarketValueCell record={awayByKey[marketKey] ?? null} />
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
               </Fragment>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
+        </div>
       </div>
     </section>
   );
@@ -529,63 +549,66 @@ function RefereeRecentFixtures({ fixtures, refereeName }: { fixtures: RecentRefe
   const visibleFixtures = expanded ? filteredFixtures : filteredFixtures.slice(0, 10);
 
   return (
-    <section className="overflow-hidden rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)]">
-      <div className="flex flex-col gap-3 border-b border-[var(--app-border)] bg-[var(--app-panel-muted)] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <h3 className="text-xs font-semibold text-[var(--app-text)]">{refereeName} {t('Recent Fixtures')}</h3>
-        <select
-          className="h-9 rounded-[5px] border border-[var(--app-input-border)] bg-[var(--app-panel)] px-3 text-[11px] text-[var(--app-text)] outline-none transition-colors hover:border-[var(--app-border-strong)]"
-          onChange={(event) => setHighlightId(event.target.value)}
-          value={highlightId}
-        >
-          <option value="none">{t('Select market to highlight')}</option>
-          {HIGHLIGHT_OPTIONS.filter((option) => option.id !== 'none').map((option) => (
-            <option key={option.id} value={option.id}>
-              {t(option.label)}
-            </option>
-          ))}
-        </select>
+    <section className="overflow-hidden rounded-md border border-border/60 bg-background shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-border/50 bg-muted/20 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <h3 className="text-[14px] font-bold uppercase tracking-widest text-foreground">{refereeName} {t('Recent Fixtures')}</h3>
+        <Select value={highlightId} onValueChange={setHighlightId}>
+          <SelectTrigger className="w-full lg:w-[280px] h-9 bg-background">
+            <SelectValue placeholder={t('Select market to highlight')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">{t('None (Clear highlight)')}</SelectItem>
+            {HIGHLIGHT_OPTIONS.filter((option) => option.id !== 'none').map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {t(option.label)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto border-b border-[var(--app-border)] px-3 py-2">
-        <button
-          className={`whitespace-nowrap rounded-[5px] px-3 py-1.5 text-[11px] transition-colors ${activeLeagueId === 'all' ? 'bg-[var(--app-panel-muted)] font-semibold text-[var(--app-text)]' : 'text-[var(--app-text-dim)] hover:bg-[var(--app-canvas)]/70 hover:text-[var(--app-text-soft)]'
-            }`}
-          onClick={() => setSelectedLeagueId('all')}
-          type="button"
-        >
-          {t('All competitions')}
-        </button>
-        {competitionTabs.map((tab) => (
-          <button
-            className={`whitespace-nowrap rounded-[5px] px-3 py-1.5 text-[11px] transition-colors ${activeLeagueId === tab.id ? 'bg-[var(--app-panel-muted)] font-semibold text-[var(--app-text)]' : 'text-[var(--app-text-dim)] hover:bg-[var(--app-canvas)]/70 hover:text-[var(--app-text-soft)]'
-              }`}
-            key={tab.id}
-            onClick={() => setSelectedLeagueId(tab.id)}
-            type="button"
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="border-b border-border/50 px-2 py-1.5">
+        <Tabs value={String(activeLeagueId)} onValueChange={(v) => setSelectedLeagueId(v === 'all' ? 'all' : Number(v))} className="w-full">
+          <div className="overflow-x-auto pb-1">
+            <TabsList className="flex h-10 w-max justify-start bg-transparent p-1">
+              <TabsTrigger
+                value="all"
+                className="text-[12px] font-medium tracking-wide data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:shadow-sm px-3 h-full rounded-sm transition-all"
+              >
+                {t('All competitions')}
+              </TabsTrigger>
+              {competitionTabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.id}
+                  value={String(tab.id)}
+                  className="text-[12px] font-medium tracking-wide data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:shadow-sm px-3 h-full rounded-sm transition-all"
+                >
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+        </Tabs>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-[var(--app-border)] text-[var(--app-text-dim)]">
-              <th className="px-2 py-2 text-left">{t('Date')}</th>
-              <th className="px-2 py-2 text-left">{t('Competition')}</th>
-              <th className="px-2 py-2 text-right">{t('Home')}</th>
-              <th className="px-2 py-2 text-center">{t('Fixture')}</th>
-              <th className="px-2 py-2 text-left">{t('Away')}</th>
-              <th className="px-2 py-2 text-center">{t('Booking Points')}</th>
-              <th className="px-2 py-2 text-center">{t('Total Points')}</th>
-              <th className="px-2 py-2 text-center">{t('Fouls')}</th>
-              <th className="px-2 py-2 text-center">{t('Yellows')}</th>
-              <th className="px-2 py-2 text-center">{t('Reds')}</th>
-              <th className="px-2 py-2 text-center">{t('Pens')}</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="min-w-[980px]">
+          <TableHeader className="bg-muted/10">
+            <TableRow className="border-border/50 hover:bg-transparent">
+              <TableHead className="h-8 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Date')}</TableHead>
+              <TableHead className="h-8 px-2 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Competition')}</TableHead>
+              <TableHead className="h-8 px-3 py-1 text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Home')}</TableHead>
+              <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Fixture')}</TableHead>
+              <TableHead className="h-8 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Away')}</TableHead>
+              <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Booking Points')}</TableHead>
+              <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Total Points')}</TableHead>
+              <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Fouls')}</TableHead>
+              <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Yellows')}</TableHead>
+              <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Reds')}</TableHead>
+              <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Pens')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {visibleFixtures.map((fixture) => {
               const fact = fixture.fact;
               const isHighlighted = activeHighlight.predicate(fact);
@@ -594,50 +617,50 @@ function RefereeRecentFixtures({ fixtures, refereeName }: { fixtures: RecentRefe
                   ? `${fixture.home_goals} - ${fixture.away_goals}`
                   : formatTime(fixture.date, locale);
               return (
-                <tr
-                  className={`border-b border-[var(--app-border)] ${isHighlighted ? 'bg-emerald-500/10' : 'bg-[var(--app-panel)]'}`}
+                <TableRow
+                  className={`border-border/50 transition-colors ${isHighlighted ? 'bg-emerald-500/10 hover:bg-emerald-500/20' : 'hover:bg-muted/30'}`}
                   key={fixture.id}
                 >
-                  <td className="px-2 py-2 text-[var(--app-text-dim)]">{formatDate(fixture.date, locale)}</td>
-                  <td className="px-2 py-2 text-[var(--app-text-dim)]">{fixture.leagueName}</td>
-                  <td className="px-2 py-2 text-right text-[var(--app-text)]">{getTeamName(fixture.home_team) ?? t('Home team')}</td>
-                  <td className="px-2 py-2 text-center">
-                    <span className="inline-flex min-w-[54px] justify-center rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-2 py-1 font-semibold text-[var(--app-text)]">
+                  <TableCell className="px-3 py-1.5 text-[11px] font-medium tabular-nums text-muted-foreground whitespace-nowrap">{formatDate(fixture.date, locale)}</TableCell>
+                  <TableCell className="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{fixture.leagueName}</TableCell>
+                  <TableCell className="px-3 py-1.5 text-right text-[13px] font-semibold text-foreground">{getTeamName(fixture.home_team) ?? t('Home team')}</TableCell>
+                  <TableCell className="px-2 py-1.5 text-center">
+                    <span className="inline-flex min-w-[54px] justify-center rounded-md border border-border/60 bg-muted/20 px-2 py-0.5 font-bold tabular-nums text-[12px] text-foreground shadow-sm">
                       {scoreOrTime}
                     </span>
-                  </td>
-                  <td className="px-2 py-2 text-[var(--app-text)]">{getTeamName(fixture.away_team) ?? t('Away team')}</td>
-                  <td className="px-2 py-2 text-center text-[var(--app-text-dim)]">
+                  </TableCell>
+                  <TableCell className="px-3 py-1.5 text-[13px] font-semibold text-foreground">{getTeamName(fixture.away_team) ?? t('Away team')}</TableCell>
+                  <TableCell className="px-2 py-1.5 text-center text-[12px] font-bold tabular-nums text-muted-foreground">
                     {fact ? `${fact.home_booking_points ?? 0} - ${fact.away_booking_points ?? 0}` : '-'}
-                  </td>
-                  <td className="px-2 py-2 text-center text-[var(--app-text-dim)]">{fact?.total_booking_points ?? '-'}</td>
-                  <td className="px-2 py-2 text-center text-[var(--app-text-dim)]">{fact?.total_fouls ?? '-'}</td>
-                  <td className="px-2 py-2 text-center">
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center text-[12px] font-bold tabular-nums text-muted-foreground">{fact?.total_booking_points ?? '-'}</TableCell>
+                  <TableCell className="px-2 py-1.5 text-center text-[12px] font-bold tabular-nums text-muted-foreground">{fact?.total_fouls ?? '-'}</TableCell>
+                  <TableCell className="px-2 py-1.5 text-center">
                     {fact?.total_yellow_cards != null ? (
-                      <span className="inline-flex min-w-6 justify-center rounded-[4px] bg-[#ffd34d] px-1 font-semibold text-[#281700]">
+                      <span className="inline-flex min-w-6 justify-center rounded-md bg-[#ffd34d] px-1 py-0.5 text-[11px] font-bold text-[#281700] shadow-sm">
                         {fact.total_yellow_cards}
                       </span>
                     ) : '-'}
-                  </td>
-                  <td className="px-2 py-2 text-center">
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center">
                     {fact?.total_red_cards ? (
-                      <span className="inline-flex min-w-6 justify-center rounded-[4px] bg-[#d52f33] px-1 font-semibold text-white">
+                      <span className="inline-flex min-w-6 justify-center rounded-md bg-[#d52f33] px-1 py-0.5 text-[11px] font-bold text-white shadow-sm">
                         {fact.total_red_cards}
                       </span>
                     ) : '-'}
-                  </td>
-                  <td className="px-2 py-2 text-center text-[var(--app-text-dim)]">{fact?.penalties ?? '-'}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center text-[12px] font-bold tabular-nums text-muted-foreground">{fact?.penalties ?? '-'}</TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {filteredFixtures.length > 10 ? (
-        <div className="flex justify-center border-t border-[var(--app-border)] px-4 py-3">
+        <div className="flex justify-center border-t border-border/50 px-4 py-3">
           <button
-            className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-4 py-2 text-[11px] font-semibold text-[var(--app-text)] transition-colors hover:border-[var(--app-border-strong)] hover:bg-[var(--app-canvas)]"
+            className="rounded-md border border-border/60 bg-muted/20 px-4 py-2 text-[12px] font-semibold text-foreground transition-colors hover:border-border hover:bg-muted/40"
             onClick={() => setExpanded((value) => !value)}
             type="button"
           >
@@ -724,12 +747,12 @@ export function RefereeStatsPanel({
 
   if (!refereeId) {
     return (
-      <section className="overflow-hidden rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)]">
-        <div className="flex flex-col gap-1 border-b border-[var(--app-border)] bg-[var(--app-panel-muted)] px-4 py-3 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-[15px] font-semibold text-[var(--app-text)]">{t('Referee Stats')}</h2>
-          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{t('Referee not available yet')}</p>
+      <section className="overflow-hidden rounded-md border border-border/60 bg-background shadow-sm">
+        <div className="flex flex-col gap-1 border-b border-border/50 bg-muted/20 px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-[15px] font-bold text-foreground">{t('Referee Stats')}</h2>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Referee not available yet')}</p>
         </div>
-        <div className="px-4 py-10 text-center text-[11px] text-[var(--app-text-dim)]">
+        <div className="px-4 py-12 text-center text-[12px] font-medium text-muted-foreground">
           {t('API-Football has not assigned a referee to this fixture yet. This panel will unlock automatically once the fixture has a canonical referee.')}
         </div>
       </section>
@@ -738,24 +761,24 @@ export function RefereeStatsPanel({
 
   return (
     <section className="flex flex-col gap-5">
-      <section className="overflow-hidden rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)]">
-        <div className="flex flex-col gap-1 border-b border-[var(--app-border)] bg-[var(--app-panel-muted)] px-4 py-3 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-[15px] font-semibold text-[var(--app-text)]">{t('Referee Stats')}</h2>
-          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{displayRefereeName}</p>
+      <section className="overflow-hidden rounded-md border border-border/60 bg-background shadow-sm">
+        <div className="flex flex-col gap-1 border-b border-border/50 bg-muted/20 px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-[15px] font-bold text-foreground">{t('Referee Stats')}</h2>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{displayRefereeName}</p>
         </div>
 
         {warning ? (
-          <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
+          <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[13px] font-medium text-amber-500">
             {t(warning)}
           </div>
         ) : null}
 
         {isLoading || isTeamDataLoading ? (
-          <div className="flex h-40 items-center justify-center px-4 text-center text-xs text-[var(--app-text-dim)]">
+          <div className="flex h-40 items-center justify-center px-4 text-center text-[13px] font-medium text-muted-foreground">
             {t('Loading referee stats...')}
           </div>
         ) : (
-          <div className="grid divide-y divide-[var(--app-border)] xl:grid-cols-2 xl:divide-x xl:divide-y-0">
+          <div className="grid divide-y divide-border/50 xl:grid-cols-2 xl:divide-x xl:divide-y-0">
             <RefereeAverageSummary
               awaySummary={awaySummary}
               awayTeamName={awayTeamName}

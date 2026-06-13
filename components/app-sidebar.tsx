@@ -2,11 +2,15 @@
 
 import * as React from "react"
 import {
+  CircleDollarSign,
   CreditCard,
   Flag,
   Goal,
+  Hand,
+  Hourglass,
   LayoutGrid,
   Milestone,
+  Swords,
   Target,
   Trophy,
 } from "lucide-react"
@@ -76,6 +80,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
     { name: "Offsides", url: "/offsides", icon: Milestone, isActive: isRouteActive(pathname, "/offsides") },
     { name: t("Cards"), url: "/cards", icon: CreditCard, isActive: isRouteActive(pathname, "/cards") },
+    { name: t("Result"), url: "/markets/result", icon: Swords, isActive: isRouteActive(pathname, "/markets/result") },
+    { name: t("Half Result"), url: "/markets/half_result", icon: Hourglass, isActive: isRouteActive(pathname, "/markets/half_result") },
+    { name: "BTTS", url: "/markets/btts", icon: Goal, isActive: isRouteActive(pathname, "/markets/btts") },
+    { name: t("Booking Points"), url: "/markets/booking_points", icon: CircleDollarSign, isActive: isRouteActive(pathname, "/markets/booking_points") },
+    { name: t("Fouls"), url: "/markets/fouls", icon: Hand, isActive: isRouteActive(pathname, "/markets/fouls") },
   ]
 
   return (

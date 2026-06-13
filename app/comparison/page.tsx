@@ -35,6 +35,16 @@ import type {
     TrendCategoryId,
     UpcomingFixtureRecord,
 } from './types';
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const UPCOMING_DATE_WINDOW_DAYS = 14; // Wide enough for WC 2026 off-season gaps
 const EMPTY_COMPARISON_DATA: ComparisonCoreResponse = {
@@ -257,6 +267,7 @@ export default function ComparisonPage() {
 
     const isFixturesLoading = fixtureMode === 'upcoming' ? isUpcomingLoading : isRecentLoading;
     const showRecentMatches = activeTab === 'recent-matches';
+    const showPredictions = activeTab === 'predictions';
     const showStatistics = activeTab === 'statistics';
     const showPlayerStats = activeTab === 'player-stats';
     const showRefereeStats = activeTab === 'referee-stats';
@@ -389,8 +400,6 @@ export default function ComparisonPage() {
                     ? 'Predictions'
                     : 'Odds',
     );
-    const activeTabDescription = getTabDescription(activeTab, t);
-    const activeTabEyebrow = getSectionEyebrow(activeTab, t);
     const fixtureDateLabel = effectiveFixture ? formatFixtureDateTime(effectiveFixture.date, locale) : null;
     const competitionLabel = effectiveLeagueName ?? t('League');
     const scopeLabel = scope === 'all' ? t('All matches') : t('Home / Away');
@@ -427,98 +436,185 @@ export default function ComparisonPage() {
         <div className="comparison-page flex min-h-full flex-col overflow-x-hidden px-5 py-5 text-[var(--app-text)] md:px-7 md:py-7">
             <div className="mx-auto flex w-full max-w-[1640px] flex-col gap-6">
                 <section className="flex flex-col gap-4">
-                    <div className="overflow-hidden rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)]">
-                        {effectiveFixture && homeTeam && awayTeam ? (
-                            <div className="grid gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)] lg:px-6">
-                                <div className="flex min-w-0 items-center gap-4">
-                                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel-muted)]">
-                                            {homeTeam.logo_url ? (
-                                                <Image alt={`${homeTeamNameDisplay} logo`} className="h-10 w-10 object-contain" height={40} src={homeTeam.logo_url} width={40} />
-                                            ) : (
-                                                <span className="text-lg font-semibold text-[var(--app-text-dim)]">{homeTeamInitials}</span>
-                                            )}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate text-lg font-semibold text-[var(--app-text)] md:text-xl">{homeTeamNameDisplay}</p>
-                                            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--app-text-dim)]">{t('Home')}</p>
-                                        </div>
-                                    </div>
+                    {/* ── Premium Header Bar ── */}
+                    <div className="overflow-hidden rounded-[5px] border border-border/60 bg-background">
+                        <div className="flex flex-col divide-y divide-border/50 lg:flex-row lg:divide-x lg:divide-y-0">
 
-                                    <div className="shrink-0 text-center">
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--app-text-dim)]">{competitionLabel}</p>
-                                        <p className="mt-1 text-sm font-semibold text-[var(--app-text)]">vs</p>
-                                        <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--app-text-dim)]">{scopeLabel}</p>
-                                    </div>
+                            {/* LEFT — Compact matchup */}
+                            <div className="flex min-w-0 flex-1 items-center gap-0 px-5 py-4">
+                                {effectiveFixture && homeTeam && awayTeam ? (
+                                    <>
+                                        {/* Home team */}
+                                        <div className="flex min-w-0 flex-1 items-center gap-4">
+                                            <div className="flex shrink-0">
+                                                {homeTeam.logo_url ? (
+                                                    <Image
+                                                        alt=""
+                                                        className="size-14 object-contain drop-shadow-sm"
+                                                        height={56}
+                                                        src={homeTeam.logo_url}
+                                                        width={56}
+                                                    />
+                                                ) : (
+                                                    <div className="flex size-14 items-center justify-center rounded-full bg-muted/20 border border-border/50">
+                                                        <span className="text-lg font-bold text-muted-foreground">{homeTeamInitials}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="truncate text-base font-bold leading-5 text-foreground">{homeTeamNameDisplay}</p>
+                                                <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">{t('Home')}</p>
+                                            </div>
+                                        </div>
 
-                                    <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-                                        <div className="min-w-0 text-right">
-                                            <p className="truncate text-lg font-semibold text-[var(--app-text)] md:text-xl">{awayTeamNameDisplay}</p>
-                                            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--app-text-dim)]">{t('Away')}</p>
+                                        {/* VS badge & Info */}
+                                        <div className="mx-6 flex shrink-0 flex-col items-center justify-center gap-1">
+                                            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">{competitionLabel}</p>
+                                            <div className="flex items-center justify-center py-0.5">
+                                                <span className="text-xl font-black italic tracking-widest text-muted-foreground/30">VS</span>
+                                            </div>
+                                            {fixtureDateLabel ? (
+                                                <p className="max-w-[160px] text-center text-[11px] font-semibold tracking-wide text-muted-foreground">{fixtureDateLabel}</p>
+                                            ) : null}
                                         </div>
-                                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel-muted)]">
-                                            {awayTeam.logo_url ? (
-                                                <Image alt={`${awayTeamNameDisplay} logo`} className="h-10 w-10 object-contain" height={40} src={awayTeam.logo_url} width={40} />
-                                            ) : (
-                                                <span className="text-lg font-semibold text-[var(--app-text-dim)]">{awayTeamInitials}</span>
-                                            )}
+
+                                        {/* Away team */}
+                                        <div className="flex min-w-0 flex-1 items-center justify-end gap-4">
+                                            <div className="min-w-0 text-right">
+                                                <p className="truncate text-base font-bold leading-5 text-foreground">{awayTeamNameDisplay}</p>
+                                                <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">{t('Away')}</p>
+                                            </div>
+                                            <div className="flex shrink-0">
+                                                {awayTeam.logo_url ? (
+                                                    <Image
+                                                        alt=""
+                                                        className="size-14 object-contain drop-shadow-sm"
+                                                        height={56}
+                                                        src={awayTeam.logo_url}
+                                                        width={56}
+                                                    />
+                                                ) : (
+                                                    <div className="flex size-14 items-center justify-center rounded-full bg-muted/20 border border-border/50">
+                                                        <span className="text-lg font-bold text-muted-foreground">{awayTeamInitials}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/10">
+                                            <span className="text-xs font-semibold text-muted-foreground/40">H</span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                            <p className="text-base font-bold text-foreground">{t('No fixture selected')}</p>
+                                            <p className="text-xs font-medium text-muted-foreground">{t('Pick a date and match →')}</p>
                                         </div>
                                     </div>
+                                )}
+                            </div>
+
+                            {/* RIGHT — Filters panel */}
+                            <div className="grid w-full grid-cols-2 gap-4 bg-muted/10 px-5 py-4 sm:flex sm:flex-wrap sm:items-end lg:w-auto lg:min-w-[540px] lg:max-w-[640px]">
+                                {/* Label row */}
+                                <div className="col-span-2 w-full mb-1 sm:col-span-1">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">{t('Fixture filters')}</p>
                                 </div>
 
-                                <div className="grid gap-3 rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel-muted)] p-4">
-                                    <div>
-                                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Kickoff')}</p>
-                                        <p className="mt-1 text-sm font-semibold text-[var(--app-text)]">{fixtureDateLabel}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{activeTabEyebrow}</p>
-                                        <p className="mt-1 text-base font-semibold text-[var(--app-text)]">{activeTabLabel}</p>
-                                        <p className="mt-1 text-sm text-[var(--app-text-soft)]">{activeTabDescription}</p>
-                                    </div>
+                                {/* Date select */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('Date')}</label>
+                                    <Select
+                                        disabled={isFixturesLoading || upcomingDates.length === 0}
+                                        onValueChange={handleDateChange}
+                                        value={effectiveDate}
+                                    >
+                                        <SelectTrigger className="h-9 w-[160px] bg-background">
+                                            <SelectValue placeholder={t('Select date')} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {isFixturesLoading ? (
+                                                <SelectItem value="loading" disabled>{t('Loading...')}</SelectItem>
+                                            ) : upcomingDates.length === 0 ? (
+                                                <SelectItem value="none" disabled>{t('No dates')}</SelectItem>
+                                            ) : (
+                                                upcomingDates.map((dateStr) => (
+                                                    <SelectItem key={dateStr} value={dateStr}>
+                                                        {new Date(`${dateStr}T12:00:00`).toLocaleDateString(locale, {
+                                                            weekday: 'short',
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                        })}
+                                                    </SelectItem>
+                                                ))
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Fixture select */}
+                                <div className="flex flex-col gap-1.5 flex-1 min-w-[240px]">
+                                    <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                                        {t('Fixture')}{Object.values(groupedFixtures).reduce((n, f) => n + f.length, 0) > 0 ? ` · ${Object.values(groupedFixtures).reduce((n, f) => n + f.length, 0)}` : ''}
+                                    </label>
+                                    <Select
+                                        disabled={isFixturesLoading || Object.keys(groupedFixtures).length === 0}
+                                        onValueChange={(val) => handleFixtureChange(val ? Number(val) : null)}
+                                        value={effectiveFixtureId?.toString() ?? ''}
+                                    >
+                                        <SelectTrigger className="h-9 w-full bg-background">
+                                            <SelectValue placeholder={t('Select fixture')} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {isFixturesLoading ? (
+                                                <SelectItem value="loading" disabled>{t('Loading fixtures...')}</SelectItem>
+                                            ) : Object.keys(groupedFixtures).length === 0 ? (
+                                                <SelectItem value="none" disabled>{t('No fixtures for this date')}</SelectItem>
+                                            ) : (
+                                                Object.entries(groupedFixtures).map(([groupKey, groupFixtures]) => {
+                                                    const label = groupKey.split(':').slice(1).join(':');
+                                                    return (
+                                                        <SelectGroup key={groupKey}>
+                                                            <SelectLabel>{label}</SelectLabel>
+                                                            {groupFixtures.map((fixture) => {
+                                                                const time = new Date(fixture.date).toLocaleTimeString(locale, {
+                                                                    hour: '2-digit',
+                                                                    hour12: false,
+                                                                    minute: '2-digit',
+                                                                });
+                                                                return (
+                                                                    <SelectItem key={fixture.id} value={fixture.id.toString()}>
+                                                                        {time} — {fixture.home_team_view?.name ?? fixture.home_team_id} vs {fixture.away_team_view?.name ?? fixture.away_team_id}
+                                                                    </SelectItem>
+                                                                );
+                                                            })}
+                                                        </SelectGroup>
+                                                    );
+                                                })
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Scope toggle */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('Scope')}</label>
+                                    <Tabs value={scope} onValueChange={(val) => setScope(val as ComparisonScope)} className="h-9">
+                                        <TabsList className="h-full bg-background border border-border/60 p-0.5">
+                                            <TabsTrigger value="all" className="text-[11px] font-bold uppercase tracking-wider data-[state=active]:bg-foreground data-[state=active]:text-background">{t('All')}</TabsTrigger>
+                                            <TabsTrigger value="split" className="text-[11px] font-bold uppercase tracking-wider data-[state=active]:bg-foreground data-[state=active]:text-background">{t('H/A')}</TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
+                                </div>
+
+                                {/* Mode toggle */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('Mode')}</label>
+                                    <FixtureModeToggle />
                                 </div>
                             </div>
-                        ) : (
-                            <div className="px-4 py-5 lg:px-6">
-                                <StatePanel
-                                    description={t('Select a date and fixture to unlock the full comparison.')}
-                                    title={t('No fixture selected yet')}
-                                />
-                            </div>
-                        )}
+                        </div>
                     </div>
-
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
-                        <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Choose fixture')}</p>
-                                    <p className="mt-1 text-sm text-[var(--app-text-soft)]">{t('Pick the match first. The rest of the page updates automatically.')}</p>
-                                </div>
-                                <FixtureModeToggle />
-                            </div>
-                            <div className="mt-4">
-                                <ComparisonToolbar
-                                    groupedFixtures={groupedFixtures}
-                                    isFixturesLoading={isFixturesLoading}
-                                    isLoading={isFixturesLoading}
-                                    onDateChange={handleDateChange}
-                                    onFixtureChange={handleFixtureChange}
-                                    selectedDate={effectiveDate}
-                                    selectedFixtureId={effectiveFixtureId}
-                                    upcomingDates={upcomingDates}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{t('Analysis scope')}</p>
-                            <p className="mt-1 text-sm text-[var(--app-text-soft)]">{t('This changes how team history is sampled across the page.')}</p>
-                            <div className="mt-4">
-                                <ScopeToggle onChange={setScope} value={scope} />
-                            </div>
-                        </div>
-                        </div>
 
                         {fixturesErrorMessage ? (
                             <div className="rounded-[5px] border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -532,13 +628,9 @@ export default function ComparisonPage() {
                             </div>
                         ) : null}
 
-                        <div className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)] p-2">
-                        <TabsNav activeTab={activeTab} onChange={setActiveTab} />
-                        <div className="border-t border-[var(--app-border)] px-2 pt-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-dim)]">{activeTabEyebrow}</p>
-                            <p className="mt-1 text-sm text-[var(--app-text-soft)]">{activeTabDescription}</p>
+                        <div className="rounded-[5px] border border-border/50 bg-background/50 p-2 backdrop-blur-sm">
+                            <TabsNav activeTab={activeTab} onChange={setActiveTab} />
                         </div>
-                    </div>
 
                     {effectiveFixture && (showRecentMatches || showStatistics || showPlayerStats || showRefereeStats) ? (
                         <div className="grid gap-3 md:grid-cols-4">
@@ -688,6 +780,26 @@ export default function ComparisonPage() {
                                 scope={scope}
                                 season={effectiveSeason}
                             />
+                        </div>
+                    ) : showPredictions ? (
+                        <div className="flex flex-col items-center justify-center rounded-[5px] border border-border/50 bg-background/40 py-24 text-center backdrop-blur-sm">
+                            <div className="mb-6 flex size-16 items-center justify-center rounded-full bg-primary/10">
+                                <svg className="size-8 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                </svg>
+                            </div>
+                            <h3 className="text-xl font-bold text-foreground">{t('AI Predictions Engine')}</h3>
+                            <p className="mt-3 max-w-[420px] text-[15px] leading-relaxed text-muted-foreground">
+                                {t('Join our Telegram channel for early access to our proprietary match prediction models and betting signals.')}
+                            </p>
+                            <a
+                                href="https://t.me/rasermoney"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-8 inline-flex h-11 items-center justify-center rounded-md bg-primary px-8 text-[15px] font-bold text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:scale-[1.02]"
+                            >
+                                {t('Join @rasermoney on Telegram')}
+                            </a>
                         </div>
                     ) : showOdds ? (
                         <div className="flex flex-col gap-4">

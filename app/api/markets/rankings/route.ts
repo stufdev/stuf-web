@@ -26,6 +26,12 @@ import {
   parseGoalQuickFilters,
   statisticFromGoalMarketKey,
 } from '@/lib/server/goal-market-scanner';
+import {
+  loadGenericFilterOptions,
+  loadGenericQuickScannerWithTiming,
+  parseGenericQuickFilters,
+} from '@/lib/server/generic-market-scanner';
+import { isGenericMarketCategory } from '@/lib/generic-market-categories';
 
 export const revalidate = 30;
 
@@ -47,7 +53,8 @@ function firstParam(value: string | string[] | undefined) {
 export async function GET(request: NextRequest) {
   const routeStartedAt = Date.now();
   const category = request.nextUrl.searchParams.get('category') ?? 'corners';
-  if (category !== 'corners' && category !== 'shots' && category !== 'goals' && category !== 'offsides' && category !== 'cards') {
+  const isKnownCategory = category === 'corners' || category === 'shots' || category === 'goals' || category === 'offsides' || category === 'cards' || isGenericMarketCategory(category);
+  if (!isKnownCategory) {
     return NextResponse.json({ error: `Unsupported market ranking category: ${category}` }, { status: 400 });
   }
 
@@ -81,7 +88,14 @@ export async function GET(request: NextRequest) {
               const { result, timing } = await loadCardQuickScannerWithTiming(filters);
               return { filters, result, timing };
             })()
-            : await (async () => {
+            : isGenericMarketCategory(category)
+              ? await (async () => {
+                const options = await loadGenericFilterOptions(category);
+                const filters = parseGenericQuickFilters(searchParamRecord, options);
+                const { result, timing } = await loadGenericQuickScannerWithTiming(filters);
+                return { filters, result, timing };
+              })()
+              : await (async () => {
           const family = statisticFromGoalMarketKey(firstParam(searchParamRecord.marketKey) ?? '')?.family
             ?? normalizeGoalFamily(searchParamRecord.family);
           const options = await loadGoalFilterOptions(family);

@@ -1,5 +1,7 @@
 import {
+  loadWorldCupFixtureOdds,
   loadWorldCupFixtures,
+  loadWorldCupPlayerStreaks,
   loadWorldCupStandings,
   loadWorldCupTeamAverages,
   loadWorldCupTopPlayers,
@@ -17,6 +19,7 @@ type WorldCupTab = 'all' | 'fixtures' | 'table' | 'top-players' | 'player-streak
 type WorldCupPageData =
   | {
       fixtures: Awaited<ReturnType<typeof loadWorldCupFixtures>>;
+      initialPlayerStreaks: Awaited<ReturnType<typeof loadWorldCupPlayerStreaks>>;
       initialTopPlayers: Awaited<ReturnType<typeof loadWorldCupTopPlayers>>;
       standings: Awaited<ReturnType<typeof loadWorldCupStandings>>;
       teamAverages: Awaited<ReturnType<typeof loadWorldCupTeamAverages>>;
@@ -52,14 +55,24 @@ async function loadWorldCupPageData(
   topPlayerParams: Parameters<typeof loadWorldCupTopPlayers>[0],
 ): Promise<WorldCupPageData> {
   try {
-    const [fixtures, standings, teamAverages, initialTopPlayers] = await Promise.all([
-      loadWorldCupFixtures(),
-      loadWorldCupStandings(),
-      loadWorldCupTeamAverages(),
-      loadWorldCupTopPlayers(topPlayerParams),
-    ]);
+    // Load fixtures first so we can join odds by fixture ID.
+    const fixtures = await loadWorldCupFixtures();
 
-    return { fixtures, initialTopPlayers, standings, teamAverages };
+    const [standings, teamAverages, initialTopPlayers, initialPlayerStreaks, fixtureOddsMap] =
+      await Promise.all([
+        loadWorldCupStandings(),
+        loadWorldCupTeamAverages(),
+        loadWorldCupTopPlayers(topPlayerParams),
+        loadWorldCupPlayerStreaks(),
+        loadWorldCupFixtureOdds(fixtures.map((f) => f.id)),
+      ]);
+
+    const fixturesWithOdds = fixtures.map((f) => ({
+      ...f,
+      matchOdds: fixtureOddsMap.get(f.id) ?? null,
+    }));
+
+    return { fixtures: fixturesWithOdds, initialPlayerStreaks, initialTopPlayers, standings, teamAverages };
   } catch (error) {
     return {
       errorMessage: error instanceof Error ? error.message : 'World Cup data could not be loaded.',
@@ -88,6 +101,7 @@ export default async function WorldCupPage({ searchParams }: WorldCupPageProps) 
   return (
     <WorldCupHubClient
       fixtures={data.fixtures}
+      initialPlayerStreaks={data.initialPlayerStreaks}
       initialTab={initialTab}
       initialTopPlayers={data.initialTopPlayers}
       standings={data.standings}

@@ -99,6 +99,39 @@ const PLAYER_FIXTURE_CONTEXT_SELECT = `
 
 const GOAL_EVENT_TYPES = ['Goal', 'Penalty', 'Own Goal'] as const;
 
+// National-team fixtures (World Cup league_id=1, or both sides flagged national)
+// have no meaningful single (league, season) sample: the squad's evidence is
+// spread across qualifiers, continental cups and friendlies. Mirror the
+// cross-competition broadening that loadComparisonCore already applies for the
+// team panels (comparison-data.ts) so the player leaderboards include that
+// history instead of starving on the empty tournament league/season.
+const NATIONAL_WC_LEAGUE_ID = 1;
+const NATIONAL_WINDOW_MONTHS = 24;
+
+function nationalCutoffIso(): string {
+  const cutoff = new Date(Date.now() - NATIONAL_WINDOW_MONTHS * 31 * 24 * 60 * 60 * 1000);
+  return cutoff.toISOString();
+}
+
+async function resolveNationalFixture(homeTeamId: number, awayTeamId: number, leagueId: number) {
+  if (leagueId === NATIONAL_WC_LEAGUE_ID) {
+    return true;
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data, error } = await supabaseAdmin
+    .from('teams')
+    .select('id, national')
+    .in('id', [homeTeamId, awayTeamId]);
+
+  if (error) {
+    throw new Error(`Failed to resolve team nationality for player stats: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as Array<{ id: number; national: boolean | null }>;
+  return rows.length === 2 && rows.every((row) => Boolean(row.national));
+}
+
 function getScopeKey(scope: ComparisonScope, side: 'home' | 'away') {
   if (scope === 'all') {
     return 'overall' as const;
@@ -292,15 +325,24 @@ async function loadTeamLeaderboard(
   season: number,
   scopeKey: 'overall' | 'home' | 'away',
   mode: PlayerMetricMode,
+  isNationalFixture: boolean,
 ) {
   const supabaseAdmin = getSupabaseAdmin();
-  const { data: statsData, error: statsError } = await supabaseAdmin
+  let statsQuery = supabaseAdmin
     .from('player_fixture_stats')
     .select(PLAYER_STATS_SELECT)
     .eq('team_id', teamId)
-    .eq('league_id', leagueId)
-    .eq('season', season)
     .order('played_at', { ascending: false });
+
+  if (isNationalFixture) {
+    // Cross-competition window: the squad's qualifiers/friendlies/continental
+    // appearances live under their real (league, season), never (1, 2026).
+    statsQuery = statsQuery.gte('played_at', nationalCutoffIso());
+  } else {
+    statsQuery = statsQuery.eq('league_id', leagueId).eq('season', season);
+  }
+
+  const { data: statsData, error: statsError } = await statsQuery;
 
   if (statsError) {
     throw new Error(`Failed to load player fixture stats: ${statsError.message}`);
@@ -393,10 +435,11 @@ export async function loadComparisonPlayerStats(
   const mode = buildMetricMode(category, goalSplit);
   const homeScopeKey = getScopeKey(scope, 'home');
   const awayScopeKey = getScopeKey(scope, 'away');
+  const isNationalFixture = await resolveNationalFixture(homeTeamId, awayTeamId, leagueId);
 
   const [homeRows, awayRows] = await Promise.all([
-    loadTeamLeaderboard(homeTeamId, leagueId, season, homeScopeKey, mode),
-    loadTeamLeaderboard(awayTeamId, leagueId, season, awayScopeKey, mode),
+    loadTeamLeaderboard(homeTeamId, leagueId, season, homeScopeKey, mode, isNationalFixture),
+    loadTeamLeaderboard(awayTeamId, leagueId, season, awayScopeKey, mode, isNationalFixture),
   ]);
 
   return {

@@ -4,6 +4,15 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { fetchJson } from '@/lib/fetch-json';
 import { useLanguage } from '../../language-provider';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PLAYER_GOAL_SPLIT_TABS, PLAYER_STATS_CATEGORY_TABS } from '../helpers';
 import type {
   ComparisonScope,
@@ -251,150 +260,142 @@ function PlayerStatsTeamTable({
 
   return (
     <section className="flex flex-col">
-      <div className="border-b border-[var(--app-border)] bg-[var(--app-canvas)] px-3 py-1.5 text-[12px] text-[var(--app-text-dim)]">
+      <div className="border-b border-border/50 bg-muted/10 px-4 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
         {competitionLabel}
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_80px_80px_40px] items-center gap-2 bg-[var(--app-panel-muted)] px-3 py-1.5">
-        <p className="truncate text-[12px] font-semibold text-[var(--app-text)]">{teamName}</p>
-        <p className="text-center text-[12px] font-semibold text-[var(--app-text)]">{t(columnLabel)}</p>
-        <p className="text-center text-[12px] font-semibold text-[var(--app-text)]">{t('Per 90')}</p>
+      <div className="grid grid-cols-[minmax(0,1fr)_80px_80px_40px] items-center gap-2 bg-muted/20 border-b border-border/50 px-4 py-2">
+        <p className="truncate text-[12px] font-bold uppercase tracking-widest text-foreground">{teamName}</p>
+        <p className="text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t(columnLabel)}</p>
+        <p className="text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Per 90')}</p>
         <span />
       </div>
 
       <div className="overflow-x-auto">
         {isLoading ? (
-          <div className="flex h-20 items-center justify-center px-4 text-center text-[12px] text-[var(--app-text-dim)]">
+          <div className="flex h-24 items-center justify-center px-4 text-center text-[13px] font-medium text-muted-foreground">
             {t('Loading player stats...')}
           </div>
         ) : errorMessage ? (
-          <div className="flex h-20 items-center justify-center px-4 text-center text-[12px] text-[var(--app-danger-text)]">
+          <div className="flex h-24 items-center justify-center px-4 text-center text-[13px] font-medium text-destructive">
             {t(errorMessage)}
           </div>
         ) : visibleRows.length === 0 ? (
-          <div className="flex h-20 items-center justify-center px-4 text-center text-[12px] text-[var(--app-text-dim)]">
+          <div className="flex h-24 items-center justify-center px-4 text-center text-[13px] font-medium text-muted-foreground">
             {emptyMessage}
           </div>
         ) : (
-          <table className="w-full border-collapse">
-            <tbody>
+          <Table>
+            <TableBody>
               {visibleRows.map((row) => {
                 const isExpanded = expandedPlayerId === row.playerId;
 
                 return (
                   <Fragment key={row.playerId}>
-                    <tr
-                      className={`border-b border-[var(--app-border)] transition-colors ${
-                        isExpanded ? 'bg-[var(--app-panel-muted)]' : 'bg-[var(--app-panel)]'
+                    <TableRow
+                      className={`border-border/50 transition-colors hover:bg-muted/30 cursor-pointer ${
+                        isExpanded ? 'bg-muted/20 hover:bg-muted/20' : ''
                       }`}
+                      onClick={() => setExpandedPlayerId((currentValue) => (currentValue === row.playerId ? null : row.playerId))}
                     >
-                      <td className="px-3 py-1.5">
-                        <button
-                          className="text-left text-[12px] font-medium text-[var(--app-text)] hover:text-[var(--app-text)]"
-                          onClick={() => setExpandedPlayerId((currentValue) => (currentValue === row.playerId ? null : row.playerId))}
-                          type="button"
-                        >
-                          {row.playerName}
-                        </button>
-                      </td>
-                      <td className="px-2 py-1.5 text-center text-[12px] font-semibold tabular-nums text-[var(--app-text)]">
+                      <TableCell className="px-4 py-2 text-[13px] font-semibold text-foreground">
+                        {row.playerName}
+                      </TableCell>
+                      <TableCell className="px-2 py-2 text-center text-[13px] font-bold tabular-nums text-foreground">
                         {row.total}
-                      </td>
-                      <td className="px-2 py-1.5 text-center text-[12px] tabular-nums text-[var(--app-text-dim)]">
+                      </TableCell>
+                      <TableCell className="px-2 py-2 text-center text-[13px] tabular-nums text-muted-foreground">
                         {formatPer90(row.per90)}
-                      </td>
-                      <td className="px-2 py-1.5 text-right">
-                        <button
-                          aria-expanded={isExpanded}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-[5px] border border-[var(--app-border)] bg-[var(--app-canvas)] text-[var(--app-text-dim)] transition-colors hover:text-[var(--app-text)]"
-                          onClick={() => setExpandedPlayerId((currentValue) => (currentValue === row.playerId ? null : row.playerId))}
-                          type="button"
+                      </TableCell>
+                      <TableCell className="px-4 py-2 text-right">
+                        <div
+                          className="inline-flex size-6 items-center justify-center rounded-md border border-border/50 bg-background text-muted-foreground transition-colors hover:text-foreground hover:border-border"
                         >
                           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        </button>
-                      </td>
-                    </tr>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                     {isExpanded ? (
-                      <tr className="border-b border-[var(--app-border)] bg-[var(--app-panel-muted)]">
-                        <td className="px-3 pb-3 pt-2" colSpan={4}>
-                          <div className="pt-1">
-                            <div className="mb-2 flex items-center justify-between gap-3 px-1">
-                              <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--app-text-dim)]">
+                      <TableRow className="border-border/50 bg-muted/10 hover:bg-muted/10">
+                        <TableCell className="p-0" colSpan={4}>
+                          <div className="px-4 py-3">
+                            <div className="mb-3 flex items-center justify-between gap-3 px-1">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                 {t('Per match breakdown')}
                               </p>
-                              <p className="text-[12px] text-[var(--app-text-dim)]">
+                              <p className="text-[11px] font-medium text-muted-foreground">
                                 {row.matches} {t('Matches').toLowerCase()}, {row.minutes} min
                               </p>
                             </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full border-collapse text-left">
-                                <thead>
-                                  <tr className="border-b border-[var(--app-border)]">
-                                    <th className="px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--app-text-dim)]">
+                            <div className="overflow-x-auto rounded-md border border-border/50 bg-background shadow-sm">
+                              <Table>
+                                <TableHeader className="bg-muted/20">
+                                  <TableRow className="border-border/50 hover:bg-transparent">
+                                    <TableHead className="h-8 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                       {t('Date')}
-                                    </th>
-                                    <th className="px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--app-text-dim)]">
+                                    </TableHead>
+                                    <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                       {t('H/A')}
-                                    </th>
-                                    <th className="px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--app-text-dim)]">
+                                    </TableHead>
+                                    <TableHead className="h-8 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                       {t('Opponent')}
-                                    </th>
-                                    <th className="px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--app-text-dim)]">
+                                    </TableHead>
+                                    <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                       {t('Score')}
-                                    </th>
-                                    <th className="px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--app-text-dim)]">
+                                    </TableHead>
+                                    <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                       {t('Mins')}
-                                    </th>
-                                    <th className="px-2 py-0.5 text-right text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--app-text-dim)]">
+                                    </TableHead>
+                                    <TableHead className="h-8 px-3 py-1 text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                       {t(columnLabel)}
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
+                                    </TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
                                   {row.details.map((detail) => (
-                                    <tr
+                                    <TableRow
                                       key={`${row.playerId}-${detail.fixtureId}`}
-                                      className="border-b border-[var(--app-border)] last:border-b-0"
+                                      className="border-border/50 hover:bg-muted/30"
                                     >
-                                      <td className="px-2 py-1 text-[12px] text-[var(--app-text-dim)]">
+                                      <TableCell className="px-3 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap">
                                         {formatMatchDate(detail.playedAt, locale)}
-                                      </td>
-                                      <td className="px-2 py-1 text-[12px] font-semibold text-[var(--app-text)]">
+                                      </TableCell>
+                                      <TableCell className="px-2 py-1.5 text-center text-[11px] font-bold text-foreground">
                                         {detail.homeAway === 'H' ? t('Home short') : t('Away short')}
-                                      </td>
-                                      <td className="px-2 py-1 text-[12px] text-[var(--app-text)]">
+                                      </TableCell>
+                                      <TableCell className="px-3 py-1.5 text-[12px] font-medium text-foreground">
                                         {detail.opponentName}
-                                      </td>
-                                      <td className="px-2 py-1 text-[12px] font-medium text-[var(--app-text)]">
+                                      </TableCell>
+                                      <TableCell className="px-2 py-1.5 text-center text-[12px] font-bold text-foreground">
                                         {detail.score}
-                                      </td>
-                                      <td className="px-2 py-1 text-[12px] tabular-nums text-[var(--app-text-dim)]">
+                                      </TableCell>
+                                      <TableCell className="px-2 py-1.5 text-center text-[12px] tabular-nums text-muted-foreground">
                                         {detail.minutes}
-                                      </td>
-                                      <td className="px-2 py-1 text-right text-[12px] font-semibold tabular-nums text-[var(--app-text)]">
+                                      </TableCell>
+                                      <TableCell className="px-3 py-1.5 text-right text-[12px] font-bold tabular-nums text-foreground">
                                         {detail.total}
-                                      </td>
-                                    </tr>
+                                      </TableCell>
+                                    </TableRow>
                                   ))}
-                                </tbody>
-                              </table>
+                                </TableBody>
+                              </Table>
                             </div>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ) : null}
                   </Fragment>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 
       {rows.length > DEFAULT_VISIBLE_ROWS ? (
-        <div className="flex justify-center border-t border-[var(--app-border)] px-3 py-2">
+        <div className="flex justify-center border-t border-border/50 px-4 py-3">
           <button
-            className="rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel-muted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--app-text)] transition-colors hover:border-[var(--app-border-strong)]"
+            className="rounded-md border border-border/60 bg-muted/20 px-4 py-2 text-[12px] font-semibold text-foreground transition-colors hover:border-border hover:bg-muted/40"
             onClick={() => setVisibleCount((currentValue) => (currentValue >= rows.length ? DEFAULT_VISIBLE_ROWS : rows.length))}
             type="button"
           >
@@ -420,7 +421,17 @@ export function PlayerStatsPanel({
   const [category, setCategory] = useState<PlayerStatsCategoryId>('goals');
   const [goalSplit, setGoalSplit] = useState<PlayerGoalSplitId>('goals');
 
-  const mode = useMemo(() => buildMetricMode(category, goalSplit), [category, goalSplit]);
+  // World Cup (league 1) leaderboards are widened server-side to the squad's
+  // cross-competition history, so the "*league only" caption would mislead.
+  const isNationalFixture = leagueId === 1;
+  const baseMode = useMemo(() => buildMetricMode(category, goalSplit), [category, goalSplit]);
+  const mode = useMemo(
+    () =>
+      isNationalFixture
+        ? { ...baseMode, summaryLabel: baseMode.summaryLabel.replace('*league only', '*all competitions') }
+        : baseMode,
+    [baseMode, isNationalFixture],
+  );
   const homeTableKey = `${homeTeamId ?? 'none'}:${leagueId ?? 'none'}:${season ?? 'none'}:${scope}:${category}:${goalSplit}`;
   const awayTableKey = `${awayTeamId ?? 'none'}:${leagueId ?? 'none'}:${season ?? 'none'}:${scope}:${category}:${goalSplit}`;
   const { data, errorMessage, isLoading } = usePlayerLeaderboards(
@@ -435,69 +446,64 @@ export function PlayerStatsPanel({
   const scopedHomeTeamName = getScopedTeamLabel(homeTeamName, t('Home').toLowerCase(), scope);
   const scopedAwayTeamName = getScopedTeamLabel(awayTeamName, t('Away').toLowerCase(), scope);
   const competitionLabel = useMemo(
-    () => formatCompetitionLabel(leagueName, season, t('League'), t('Season')),
-    [leagueName, season, t],
+    () =>
+      isNationalFixture
+        ? `${leagueName ?? t('National teams')} · ${t('all competitions (last 24 months)')}`
+        : formatCompetitionLabel(leagueName, season, t('League'), t('Season')),
+    [isNationalFixture, leagueName, season, t],
   );
 
   return (
-    <section className="overflow-hidden rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)]">
-      <div className="flex flex-col gap-1 border-b border-[var(--app-border)] bg-[var(--app-panel-muted)] px-4 py-3 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-[15px] font-semibold text-[var(--app-text)]">{t('Player Stats')}</h2>
-        <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{t('Per 90 statistics')}</p>
+    <section className="overflow-hidden rounded-md border border-border/60 bg-background shadow-sm">
+      <div className="flex items-center justify-between border-b border-border/50 bg-muted/20 px-4 py-3">
+        <h2 className="text-[15px] font-bold text-foreground">{t('Player Stats')}</h2>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Per 90 statistics')}</p>
       </div>
 
-      <div className="border-b border-[var(--app-border)] px-3 py-2">
-        <div className="flex flex-wrap gap-1.5">
-          {PLAYER_STATS_CATEGORY_TABS.map((tab) => {
-            const isActive = tab.id === category;
-            return (
-              <button
-                key={tab.id}
-                className={`rounded-[5px] border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  isActive
-                    ? 'border-[var(--app-border-strong)] bg-[var(--app-panel-muted)] text-[var(--app-text)]'
-                    : 'border-transparent bg-transparent text-[var(--app-text-dim)] hover:bg-[var(--app-panel-muted)] hover:text-[var(--app-text)]'
-                }`}
-                onClick={() => setCategory(tab.id)}
-                type="button"
-              >
-                {t(tab.label)}
-              </button>
-            );
-          })}
-        </div>
+      <div className="border-b border-border/50 px-2 py-1.5">
+        <Tabs value={category} onValueChange={(v) => setCategory(v as PlayerStatsCategoryId)} className="w-full">
+          <div className="overflow-x-auto pb-1">
+            <TabsList className="flex h-10 w-max justify-start bg-transparent p-1">
+              {PLAYER_STATS_CATEGORY_TABS.map((tab) => (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className="text-[12px] font-medium tracking-wide data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:shadow-sm px-3 h-full rounded-sm transition-all"
+                >
+                  {t(tab.label)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+        </Tabs>
       </div>
 
       {category === 'goals' ? (
-        <div className="border-b border-[var(--app-border)] px-3 py-2">
-          <div className="flex flex-wrap gap-1.5">
-            {PLAYER_GOAL_SPLIT_TABS.map((tab) => {
-              const isActive = tab.id === goalSplit;
-              return (
-                <button
-                  key={tab.id}
-                  className={`rounded-[5px] border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    isActive
-                      ? 'border-[var(--app-border-strong)] bg-[var(--app-panel-muted)] text-[var(--app-text)]'
-                      : 'border-transparent bg-transparent text-[var(--app-text-dim)] hover:bg-[var(--app-panel-muted)] hover:text-[var(--app-text)]'
-                  }`}
-                  onClick={() => setGoalSplit(tab.id)}
-                  type="button"
-                >
-                  {t(tab.label)}
-                </button>
-              );
-            })}
-          </div>
+        <div className="border-b border-border/50 px-2 py-1">
+          <Tabs value={goalSplit} onValueChange={(v) => setGoalSplit(v as PlayerGoalSplitId)} className="w-full">
+            <div className="overflow-x-auto pb-1">
+              <TabsList className="flex h-9 w-max justify-start bg-muted/20 p-1 rounded-md">
+                {PLAYER_GOAL_SPLIT_TABS.map((tab) => (
+                  <TabsTrigger
+                    key={tab.id}
+                    value={tab.id}
+                    className="text-[11px] font-medium data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:shadow-sm px-3 h-full rounded-sm transition-all"
+                  >
+                    {t(tab.label)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+          </Tabs>
         </div>
       ) : null}
 
-      <div className="flex flex-col justify-between gap-2 border-b border-[var(--app-border)] bg-[var(--app-panel-muted)] px-4 py-2.5 md:flex-row md:items-center">
-        <p className="text-[11px] font-semibold text-[var(--app-text)]">{t(mode.summaryLabel)}</p>
-        <p className="text-xs font-medium text-[var(--app-text-dim)]">{t('Click a player to expand per-match detail')}</p>
+      <div className="flex flex-col justify-between gap-2 border-b border-border/50 bg-muted/10 px-4 py-3 md:flex-row md:items-center">
+        <p className="text-[12px] font-bold uppercase tracking-widest text-foreground">{t(mode.summaryLabel)}</p>
+        <p className="text-[11px] font-medium text-muted-foreground">{t('Click a player to expand per-match detail')}</p>
       </div>
 
-      <div className="grid divide-y divide-[var(--app-border)] xl:grid-cols-2 xl:divide-x xl:divide-y-0">
+      <div className="grid divide-y divide-border/50 xl:grid-cols-2 xl:divide-x xl:divide-y-0">
         <PlayerStatsTeamTable
           key={homeTableKey}
           columnLabel={mode.columnLabel}

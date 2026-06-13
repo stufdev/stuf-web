@@ -31,11 +31,18 @@ import {
   statisticFromGoalMarketKey,
   type GoalDetailTiming,
 } from '@/lib/server/goal-market-scanner';
+import {
+  loadGenericFilterOptions,
+  loadGenericMatchEvidence,
+  parseGenericFilters,
+  type GenericDetailTiming,
+} from '@/lib/server/generic-market-scanner';
+import { isGenericMarketCategory } from '@/lib/generic-market-categories';
 
 export const revalidate = 30;
 
 type MarketSearchParams = Record<string, string | string[] | undefined>;
-type MarketDetailTiming = (CornerDetailTiming | ShotDetailTiming | GoalDetailTiming | OffsideDetailTiming | CardDetailTiming) & {
+type MarketDetailTiming = (CornerDetailTiming | ShotDetailTiming | GoalDetailTiming | OffsideDetailTiming | CardDetailTiming | GenericDetailTiming) & {
   serializationMs: number;
   totalRouteMs: number;
   payloadBytes: number;
@@ -79,7 +86,8 @@ function serverTiming(timing: MarketDetailTiming) {
 
 export async function GET(request: NextRequest) {
   const category = request.nextUrl.searchParams.get('category') ?? 'corners';
-  if (category !== 'corners' && category !== 'shots' && category !== 'goals' && category !== 'offsides' && category !== 'cards') {
+  const isKnownCategory = category === 'corners' || category === 'shots' || category === 'goals' || category === 'offsides' || category === 'cards' || isGenericMarketCategory(category);
+  if (!isKnownCategory) {
     return NextResponse.json({ error: `Unsupported match evidence category: ${category}` }, { status: 400 });
   }
 
@@ -132,7 +140,18 @@ export async function GET(request: NextRequest) {
               const { result, timing } = await loadCardMatchEvidence(filters, selectedTeamIds);
               return { filters, result, timing };
             })()
-            : await (async () => {
+            : isGenericMarketCategory(category)
+              ? await (async () => {
+                const options = await loadGenericFilterOptions(category);
+                const filters = parseGenericFilters(searchParamRecord, options);
+                const selectedTeamIds = teamIds.length > 0 ? teamIds : filters.teamId === null ? [] : [filters.teamId];
+                if (selectedTeamIds.length === 0) {
+                  throw new Error('teamIds is required for match evidence requests.');
+                }
+                const { result, timing } = await loadGenericMatchEvidence(filters, selectedTeamIds);
+                return { filters, result, timing };
+              })()
+              : await (async () => {
           const family = statisticFromGoalMarketKey(firstParam(searchParamRecord.marketKey) ?? '')?.family
             ?? normalizeGoalFamily(searchParamRecord.family);
           const options = await loadGoalFilterOptions(family);

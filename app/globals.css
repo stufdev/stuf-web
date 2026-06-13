@@ -42,8 +42,8 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", monospace;
+  --font-sans: var(--font-ui), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-ui-mono), ui-monospace, "SF Mono", monospace;
 }
 
 /* ── New York defaults — light mode ── */

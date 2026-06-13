@@ -2,6 +2,12 @@
 
 import { Fragment } from 'react';
 import { useLanguage } from '../../language-provider';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from '@/components/ui/table';
 import type { TeamStatAveragesRecord } from '../types';
 
 type StatisticsSummaryPanelProps = {
@@ -24,10 +30,10 @@ function getCellHighlight(left: number | null | undefined, right: number | null 
   if (left == null || right == null) return '';
   if (left === right) return '';
   if (side === 'left' && left > right) {
-    return 'bg-emerald-500/10 text-[#ecfff3] font-semibold';
+    return 'bg-emerald-500/10 text-foreground font-bold';
   }
   if (side === 'right' && right > left) {
-    return 'bg-emerald-500/10 text-[#ecfff3] font-semibold';
+    return 'bg-emerald-500/10 text-foreground font-bold';
   }
   return '';
 }
@@ -153,43 +159,43 @@ export function StatisticsSummaryPanel({ awaySummary, awayTeamName, homeSummary,
   const sections = buildSections(homeSummary, awaySummary);
 
   return (
-    <section className="overflow-hidden rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)]">
-      <div className="grid border-b border-[var(--app-border)] md:grid-cols-[1fr_200px_1fr]">
-        <div className="border-r border-[var(--app-border)] bg-[var(--app-panel-muted)] px-3 py-2 text-left">
-          <h2 className="text-[14px] font-semibold text-[var(--app-text)]">{homeTeamName} ({t(getScopeLabel(homeSummary))})</h2>
+    <section className="overflow-hidden rounded-md border border-border/60 bg-background shadow-sm">
+      <div className="grid border-b border-border/50 md:grid-cols-[1fr_200px_1fr]">
+        <div className="border-r border-border/50 bg-muted/20 px-4 py-3 text-left">
+          <h2 className="text-[12px] font-bold uppercase tracking-widest text-foreground">{homeTeamName} ({t(getScopeLabel(homeSummary))})</h2>
         </div>
-        <div className="border-r border-[var(--app-border)] bg-[var(--app-canvas)] px-3 py-2 text-center">
-          <p className="text-[15px] font-semibold uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{t('Team comparison summary')}</p>
+        <div className="border-r border-border/50 bg-background px-4 py-3 flex items-center justify-center text-center">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Team comparison summary')}</p>
         </div>
-        <div className="bg-[var(--app-panel-muted)] px-3 py-2 text-right">
-          <h2 className="text-[14px] font-semibold text-[var(--app-text)]">{awayTeamName} ({t(getScopeLabel(awaySummary))})</h2>
+        <div className="bg-muted/20 px-4 py-3 text-right">
+          <h2 className="text-[12px] font-bold uppercase tracking-widest text-foreground">{awayTeamName} ({t(getScopeLabel(awaySummary))})</h2>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="flex h-32 items-center justify-center text-[15px] text-[var(--app-text-dim)]">{t('Loading statistics summary...')}</div>
+        <div className="flex h-32 items-center justify-center text-[13px] font-medium text-muted-foreground">{t('Loading statistics summary...')}</div>
       ) : !homeSummary || !awaySummary ? (
-        <div className="flex h-32 items-center justify-center px-4 text-center text-[15px] text-[var(--app-text-dim)]">{t('Statistics summary is not ready yet for this fixture context.')}</div>
+        <div className="flex h-32 items-center justify-center px-4 text-center text-[13px] font-medium text-muted-foreground">{t('Statistics summary is not ready yet for this fixture context.')}</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <tbody>
+          <Table className="w-full text-left">
+            <TableBody>
               {sections.map((section) => (
                 <Fragment key={section.title}>
-                  <tr key={`${section.title}-header`} className="border-b border-[var(--app-border)] bg-[var(--app-canvas)]">
-                    <td colSpan={3} className="px-3 py-1 text-center text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{t(section.title)}</td>
-                  </tr>
+                  <TableRow key={`${section.title}-header`} className="border-border/50 bg-muted/10 hover:bg-muted/10">
+                    <TableCell colSpan={3} className="px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t(section.title)}</TableCell>
+                  </TableRow>
                   {section.rows.map((row, rowIndex) => (
-                    <tr key={`${section.title}-${row.label}`} className={`bg-[var(--app-panel)] ${rowIndex === section.rows.length - 1 ? '' : 'border-b border-[var(--app-border)]'}`}>
-                      <td className={`w-[33%] border-r border-[var(--app-border)] px-3 py-1 text-[12px] font-medium text-[var(--app-text)] ${getCellHighlight(row.left, row.right, 'left')}`}>{formatValue(row.left)}</td>
-                      <td className="w-[34%] border-r border-[var(--app-border)] px-3 py-1 text-center text-[12px] font-medium text-[var(--app-text-dim)]">{t(row.label)}</td>
-                      <td className={`w-[33%] px-3 py-1 text-right text-[12px] font-medium text-[var(--app-text)] ${getCellHighlight(row.left, row.right, 'right')}`}>{formatValue(row.right)}</td>
-                    </tr>
+                    <TableRow key={`${section.title}-${row.label}`} className={`border-border/50 hover:bg-muted/30 ${rowIndex === section.rows.length - 1 ? 'border-b' : ''}`}>
+                      <TableCell className={`w-[33%] border-r border-border/50 px-4 py-1.5 text-[13px] font-semibold text-foreground ${getCellHighlight(row.left, row.right, 'left')}`}>{formatValue(row.left)}</TableCell>
+                      <TableCell className="w-[34%] border-r border-border/50 px-4 py-1.5 text-center text-[12px] font-bold text-muted-foreground">{t(row.label)}</TableCell>
+                      <TableCell className={`w-[33%] px-4 py-1.5 text-right text-[13px] font-semibold text-foreground ${getCellHighlight(row.left, row.right, 'right')}`}>{formatValue(row.right)}</TableCell>
+                    </TableRow>
                   ))}
                 </Fragment>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </section>

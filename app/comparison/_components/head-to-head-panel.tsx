@@ -3,7 +3,21 @@
 import { useLanguage } from '../../language-provider';
 import { getMarketGroup, MARKET_GROUPS } from '../../market-catalog';
 import { RedCardSlot } from './red-card-slot';
-import { SelectField } from '../../components/select-field';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   getCenterColumnLabel,
   getMatchDisplayValue,
@@ -37,29 +51,29 @@ function HeadToHeadRow({
   const rowClass = getMatchRowClass(match.hit);
 
   return (
-    <tr className={`border-b border-[var(--app-border)] bg-[var(--app-panel)] last:border-b-0 ${rowClass}`}>
-      <td className="px-3 py-2.5 font-mono text-[12px] tabular-nums text-[var(--app-text-dim)]">
+    <TableRow className={`border-border/50 hover:bg-muted/30 ${rowClass}`}>
+      <TableCell className="px-3 py-1.5 font-mono text-[12px] tabular-nums text-muted-foreground whitespace-nowrap">
         {match.date}
-      </td>
-      <td className="px-2 py-2.5 text-center text-[12px] font-medium uppercase tracking-[0.06em] text-[var(--app-text-dim)]">
+      </TableCell>
+      <TableCell className="px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
         {match.competitionLabel}
-      </td>
-      <td className="px-3 py-2.5">
+      </TableCell>
+      <TableCell className="px-3 py-1.5">
         <div className="grid grid-cols-[minmax(0,1fr)_36px] items-center gap-2">
-          <span className="truncate text-right text-[12px] font-medium text-[var(--app-text)]">{match.homeTeamName}</span>
+          <span className="truncate text-right text-[13px] font-semibold text-foreground">{match.homeTeamName}</span>
           <RedCardSlot align="right" redCards={match.homeRedCards} />
         </div>
-      </td>
-      <td className="px-2 py-2.5 text-center">
-        <span className={`font-mono text-[12px] font-semibold tabular-nums ${valueClass}`}>{displayValue}</span>
-      </td>
-      <td className="px-3 py-2.5">
+      </TableCell>
+      <TableCell className="px-2 py-1.5 text-center">
+        <span className={`font-mono text-[13px] font-bold tabular-nums ${valueClass}`}>{displayValue}</span>
+      </TableCell>
+      <TableCell className="px-3 py-1.5">
         <div className="grid grid-cols-[36px_minmax(0,1fr)] items-center gap-2">
           <RedCardSlot align="left" redCards={match.awayRedCards} />
-          <span className="truncate text-[12px] font-medium text-[var(--app-text)]">{match.awayTeamName}</span>
+          <span className="truncate text-[13px] font-semibold text-foreground">{match.awayTeamName}</span>
         </div>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -81,63 +95,79 @@ export function HeadToHeadPanel({
   const centerColumnLabel = getCenterColumnLabel(selectedLine?.key ?? marketKey, language);
 
   return (
-    <section className="overflow-hidden rounded-[5px] border border-[var(--app-border)] bg-[var(--app-panel)]">
-      <div className="flex items-center gap-2 border-b border-[var(--app-border)] bg-[var(--app-panel-muted)] px-3 py-2">
+    <section className="overflow-hidden rounded-md border border-border/60 bg-background shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border/50 bg-muted/20 px-4 py-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className="text-[14px] font-semibold uppercase tracking-[0.1em] text-[var(--app-text-dim)]">
+          <div className="flex items-center gap-2">
+            <p className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground/80">
               {t('Head To Head')}
             </p>
-            <span className="text-[15px] font-medium text-[var(--app-text-dim)]">
+            <span className="text-[12px] font-medium text-muted-foreground/60">
               {t(scopeLabel)}
             </span>
           </div>
-          <p className="truncate text-[14px] font-semibold text-[var(--app-text)]">
+          <p className="mt-0.5 truncate text-[15px] font-bold text-foreground">
             {homeTeamName} vs {awayTeamName}
           </p>
         </div>
       </div>
 
-      <div className="grid gap-3 border-b border-[var(--app-border)] bg-[var(--app-panel-muted)] px-3 py-3 md:grid-cols-2">
-        <SelectField label={t('Show stat type')} onChange={onMarketGroupChange} value={marketGroupId}>
-          {MARKET_GROUPS.map((group) => (
-            <option key={group.id} value={group.id}>
-              {t(group.label)}
-            </option>
-          ))}
-        </SelectField>
+      <div className="grid gap-4 border-b border-border/50 bg-muted/10 px-4 py-3 md:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('Show stat type')}</label>
+          <Select value={marketGroupId} onValueChange={onMarketGroupChange}>
+            <SelectTrigger className="h-8 bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MARKET_GROUPS.map((group) => (
+                <SelectItem key={group.id} value={group.id}>
+                  {t(group.label)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <SelectField label={t('Highlight market')} onChange={onMarketKeyChange} value={selectedLine?.key ?? ''}>
-          {selectedGroup.lines.map((line) => (
-            <option key={line.key} value={line.key}>
-              {t(line.label)}
-            </option>
-          ))}
-        </SelectField>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('Highlight market')}</label>
+          <Select value={selectedLine?.key ?? ''} onValueChange={onMarketKeyChange}>
+            <SelectTrigger className="h-8 bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {selectedGroup.lines.map((line) => (
+                <SelectItem key={line.key} value={line.key}>
+                  {t(line.label)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
         {isLoading ? (
-          <div className="flex h-20 items-center justify-center text-[15px] text-[var(--app-text-dim)]">{t('Loading...')}</div>
+          <div className="flex h-24 items-center justify-center text-[13px] font-medium text-muted-foreground">{t('Loading...')}</div>
         ) : data.length === 0 ? (
-          <div className="flex h-20 items-center justify-center text-[15px] text-[var(--app-text-dim)]">{emptyMessage}</div>
+          <div className="flex h-24 items-center justify-center text-[13px] font-medium text-muted-foreground">{emptyMessage}</div>
         ) : (
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b border-[var(--app-border)] bg-[var(--app-canvas)]">
-                <th className="px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{t('Date')}</th>
-                <th className="px-2 py-2 text-center text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{t('Comp')}</th>
-                <th className="px-3 py-2 text-right text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{t('Home')}</th>
-                <th className="px-2 py-2 text-center text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{centerColumnLabel}</th>
-                <th className="px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--app-text-dim)]">{t('Away')}</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader className="bg-muted/30">
+              <TableRow className="border-border/50 hover:bg-transparent">
+                <TableHead className="h-8 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Date')}</TableHead>
+                <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Comp')}</TableHead>
+                <TableHead className="h-8 px-3 py-1 text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Home')}</TableHead>
+                <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{centerColumnLabel}</TableHead>
+                <TableHead className="h-8 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Away')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {data.map((match) => (
                 <HeadToHeadRow key={match.id} marketKey={selectedLine?.key ?? marketKey} match={match} />
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
     </section>
