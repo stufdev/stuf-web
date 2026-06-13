@@ -184,11 +184,11 @@ export function getMatchDisplayValue(match: HistoricalMatch, statType: string) {
 }
 
 export function getMatchRowClass(hit: boolean | null) {
-  return hit === true ? 'bg-emerald-500/10' : '';
+  return hit === true ? 'bg-teal-500/8' : '';
 }
 
 export function getMatchValueClass(hit: boolean | null) {
-  if (hit === true) return 'text-[#d7ffe6]';
+  if (hit === true) return 'text-teal-700 dark:text-teal-300';
   if (hit === false) return 'text-[var(--app-text)]';
   return 'text-[var(--app-text-dim)]';
 }

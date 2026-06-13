@@ -2,41 +2,53 @@
 
 import { useFixtureMode } from '../fixture-mode-provider';
 import { useLanguage } from '../language-provider';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { cn } from '@/lib/utils';
 
-export function FixtureModeToggle() {
+type FixtureModeToggleProps = {
+  className?: string;
+  itemClassName?: string;
+};
+
+export function FixtureModeToggle({ className, itemClassName }: FixtureModeToggleProps) {
   const { fixtureMode, setFixtureMode } = useFixtureMode();
   const { t } = useLanguage();
 
-  const base =
-    'h-7 min-w-[88px] px-3 text-[12px] font-semibold uppercase tracking-[0.1em] transition-colors';
-
   return (
-    <div
-      className="flex overflow-hidden rounded-[2px] border border-[#2a2a2a] bg-[#050505]"
+    <ToggleGroup
+      className={cn(
+        "grid h-9 w-full grid-cols-2 rounded-[5px] border border-border/60 bg-muted/15 p-0.5",
+        className,
+      )}
+      onValueChange={(value) => {
+        if (value === 'upcoming' || value === 'recent') {
+          setFixtureMode(value);
+        }
+      }}
+      size="sm"
       title={t('Switch between upcoming fixtures and recently-played results')}
+      type="single"
+      value={fixtureMode}
+      variant="default"
     >
-      <button
-        className={`${base} ${
-          fixtureMode === 'upcoming'
-            ? 'bg-[#141414] text-[#ededed]'
-            : 'bg-transparent text-[#606060] hover:bg-[#0d0d0d] hover:text-[#a1a1a1]'
-        }`}
-        onClick={() => setFixtureMode('upcoming')}
-        type="button"
+      <ToggleGroupItem
+        className={cn(
+          "flex-1 rounded-[4px] text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground data-[state=on]:bg-zinc-950 data-[state=on]:text-white dark:data-[state=on]:bg-white dark:data-[state=on]:text-zinc-950",
+          itemClassName,
+        )}
+        value="upcoming"
       >
         {t('Upcoming')}
-      </button>
-      <button
-        className={`${base} ${
-          fixtureMode === 'recent'
-            ? 'bg-[#141414] text-[#ededed]'
-            : 'bg-transparent text-[#606060] hover:bg-[#0d0d0d] hover:text-[#a1a1a1]'
-        }`}
-        onClick={() => setFixtureMode('recent')}
-        type="button"
+      </ToggleGroupItem>
+      <ToggleGroupItem
+        className={cn(
+          "flex-1 rounded-[4px] text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground data-[state=on]:bg-zinc-950 data-[state=on]:text-white dark:data-[state=on]:bg-white dark:data-[state=on]:text-zinc-950",
+          itemClassName,
+        )}
+        value="recent"
       >
         {t('Recent')}
-      </button>
-    </div>
+      </ToggleGroupItem>
+    </ToggleGroup>
   );
 }

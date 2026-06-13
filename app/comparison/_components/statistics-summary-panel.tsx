@@ -30,10 +30,10 @@ function getCellHighlight(left: number | null | undefined, right: number | null 
   if (left == null || right == null) return '';
   if (left === right) return '';
   if (side === 'left' && left > right) {
-    return 'bg-emerald-500/10 text-foreground font-bold';
+    return 'bg-teal-500/10 text-teal-700 dark:text-teal-300 font-semibold';
   }
   if (side === 'right' && right > left) {
-    return 'bg-emerald-500/10 text-foreground font-bold';
+    return 'bg-teal-500/10 text-teal-700 dark:text-teal-300 font-semibold';
   }
   return '';
 }
@@ -159,37 +159,37 @@ export function StatisticsSummaryPanel({ awaySummary, awayTeamName, homeSummary,
   const sections = buildSections(homeSummary, awaySummary);
 
   return (
-    <section className="overflow-hidden rounded-md border border-border/60 bg-background shadow-sm">
-      <div className="grid border-b border-border/50 md:grid-cols-[1fr_200px_1fr]">
-        <div className="border-r border-border/50 bg-muted/20 px-4 py-3 text-left">
-          <h2 className="text-[12px] font-bold uppercase tracking-widest text-foreground">{homeTeamName} ({t(getScopeLabel(homeSummary))})</h2>
+    <section className="overflow-hidden rounded-[6px] border border-border/60 bg-background shadow-none">
+      <div className="grid border-b border-border/50 md:grid-cols-[1fr_168px_1fr]">
+        <div className="border-r border-border/50 bg-muted/[0.06] px-4 py-2 text-left">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground">{homeTeamName} ({t(getScopeLabel(homeSummary))})</h2>
         </div>
-        <div className="border-r border-border/50 bg-background px-4 py-3 flex items-center justify-center text-center">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Team comparison summary')}</p>
+        <div className="flex items-center justify-center border-r border-border/50 bg-background px-3 py-2 text-center">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Team comparison summary')}</p>
         </div>
-        <div className="bg-muted/20 px-4 py-3 text-right">
-          <h2 className="text-[12px] font-bold uppercase tracking-widest text-foreground">{awayTeamName} ({t(getScopeLabel(awaySummary))})</h2>
+        <div className="bg-muted/[0.06] px-4 py-2 text-right">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground">{awayTeamName} ({t(getScopeLabel(awaySummary))})</h2>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="flex h-32 items-center justify-center text-[13px] font-medium text-muted-foreground">{t('Loading statistics summary...')}</div>
+        <div className="flex h-20 items-center justify-center text-[12px] font-medium text-muted-foreground">{t('Loading statistics summary...')}</div>
       ) : !homeSummary || !awaySummary ? (
-        <div className="flex h-32 items-center justify-center px-4 text-center text-[13px] font-medium text-muted-foreground">{t('Statistics summary is not ready yet for this fixture context.')}</div>
+        <div className="flex h-20 items-center justify-center px-4 text-center text-[12px] font-medium text-muted-foreground">{t('Statistics summary is not ready yet for this fixture context.')}</div>
       ) : (
         <div className="overflow-x-auto">
           <Table className="w-full text-left">
             <TableBody>
               {sections.map((section) => (
                 <Fragment key={section.title}>
-                  <TableRow key={`${section.title}-header`} className="border-border/50 bg-muted/10 hover:bg-muted/10">
-                    <TableCell colSpan={3} className="px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t(section.title)}</TableCell>
+                  <TableRow key={`${section.title}-header`} className="border-border/50 bg-muted/[0.08] hover:bg-muted/[0.08]">
+                    <TableCell colSpan={3} className="px-3 py-1.5 text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t(section.title)}</TableCell>
                   </TableRow>
                   {section.rows.map((row, rowIndex) => (
                     <TableRow key={`${section.title}-${row.label}`} className={`border-border/50 hover:bg-muted/30 ${rowIndex === section.rows.length - 1 ? 'border-b' : ''}`}>
-                      <TableCell className={`w-[33%] border-r border-border/50 px-4 py-1.5 text-[13px] font-semibold text-foreground ${getCellHighlight(row.left, row.right, 'left')}`}>{formatValue(row.left)}</TableCell>
-                      <TableCell className="w-[34%] border-r border-border/50 px-4 py-1.5 text-center text-[12px] font-bold text-muted-foreground">{t(row.label)}</TableCell>
-                      <TableCell className={`w-[33%] px-4 py-1.5 text-right text-[13px] font-semibold text-foreground ${getCellHighlight(row.left, row.right, 'right')}`}>{formatValue(row.right)}</TableCell>
+                      <TableCell className={`w-[33%] border-r border-border/50 px-4 py-1 text-[12px] font-semibold text-foreground ${getCellHighlight(row.left, row.right, 'left')}`}>{formatValue(row.left)}</TableCell>
+                      <TableCell className="w-[34%] border-r border-border/50 px-4 py-1 text-center text-[11px] font-medium text-muted-foreground">{t(row.label)}</TableCell>
+                      <TableCell className={`w-[33%] px-4 py-1 text-right text-[12px] font-semibold text-foreground ${getCellHighlight(row.left, row.right, 'right')}`}>{formatValue(row.right)}</TableCell>
                     </TableRow>
                   ))}
                 </Fragment>

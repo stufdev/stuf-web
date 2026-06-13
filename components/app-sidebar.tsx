@@ -26,6 +26,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -52,7 +53,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       items: [
         { title: t("Fixtures"), url: "/fixtures", isActive: isRouteActive(pathname, "/fixtures") },
         { title: t("Comparison"), url: "/comparison", isActive: isRouteActive(pathname, "/comparison") },
-        { title: t("Streaks"), url: "/streaks", isActive: isRouteActive(pathname, "/streaks") },
+        { title: t("Streaks"), url: "/streaks", isActive: isRouteActive(pathname, "/streaks"), hidden: true },
       ],
     },
     {
@@ -60,7 +61,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: Trophy,
       items: [
         { title: "World Cup 2026", url: "/world-cup", isActive: isRouteActive(pathname, "/world-cup") },
-        { title: t("Player Props"), url: "/player-props", isActive: isRouteActive(pathname, "/player-props") },
+        { title: t("Player Props"), url: "/player-props", isActive: isRouteActive(pathname, "/player-props"), hidden: true },
       ],
     },
   ]
@@ -107,8 +108,47 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain label={t("Platform")} items={navMain} />
-        <NavProjects label={t("Markets")} items={marketItems} />
+        {/* Flat list para las vistas principales activas */}
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isRouteActive(pathname, "/fixtures")} tooltip={t("Fixtures")}>
+                <Link href="/fixtures">
+                  <LayoutGrid />
+                  <span>{t("Fixtures")}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isRouteActive(pathname, "/world-cup")} tooltip="WC 2026">
+                <Link href="/world-cup">
+                  <Trophy />
+                  <span>WC 2026</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isRouteActive(pathname, "/comparison")} tooltip={t("Comparison")}>
+                <Link href="/comparison">
+                  <LayoutGrid />
+                  <span>{t("Comparison")}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* Estructura original oculta visualmente pero preservada en el DOM/Código */}
+        <div className="hidden">
+          <NavMain 
+            label={t("Platform")} 
+            items={navMain.map(group => ({
+              ...group,
+              items: group.items.filter(item => !item.hidden)
+            }))} 
+          />
+          <NavProjects label={t("Markets")} items={marketItems} />
+        </div>
       </SidebarContent>
       <SidebarFooter>
         <NavUser

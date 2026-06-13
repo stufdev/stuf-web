@@ -2,7 +2,6 @@
 
 import Image from 'next/image';
 import { useLanguage } from '../../language-provider';
-import { getMarketGroup, MARKET_GROUPS } from '../../market-catalog';
 import { RedCardSlot } from './red-card-slot';
 import {
   Table,
@@ -13,32 +12,24 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   getCenterColumnLabel,
   getMatchDisplayValue,
   getMatchRowClass,
   getMatchValueClass,
 } from '../helpers';
 import type { HistoricalMatch } from '../types';
+import { cn } from '@/lib/utils';
 
 /* ——— Types ——— */
 type TeamPanelProps = {
   teamName: string;
   teamLogoUrl: string | null;
   accent: 'left' | 'right';
-  marketGroupId: string;
   marketKey: string;
   matches: HistoricalMatch[];
   isLoading?: boolean;
   emptyMessage?: string;
-  onMarketGroupChange: (value: string) => void;
-  onMarketKeyChange: (value: string) => void;
+  className?: string;
 };
 
 /* ——— Row component ——— */
@@ -55,13 +46,13 @@ function MatchTableRow({
 
   return (
     <TableRow className={`border-border/50 hover:bg-muted/30 ${rowClass}`}>
-      <TableCell className="px-3 py-1.5 font-mono text-[12px] tabular-nums text-muted-foreground whitespace-nowrap">
+      <TableCell className="whitespace-nowrap px-3 py-1 font-mono text-[12px] tabular-nums text-muted-foreground">
         {match.date}
       </TableCell>
-      <TableCell className="px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+      <TableCell className="px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {match.competitionLabel}
       </TableCell>
-      <TableCell className="px-3 py-1.5">
+      <TableCell className="px-3 py-1">
         <div className="grid grid-cols-[minmax(0,1fr)_36px] items-center gap-2">
           <span className="truncate text-right text-[13px] font-medium text-foreground">
             {match.isHome ? (
@@ -73,12 +64,12 @@ function MatchTableRow({
           <RedCardSlot align="right" redCards={match.homeRedCards} />
         </div>
       </TableCell>
-      <TableCell className="px-2 py-1.5 text-center">
+      <TableCell className="px-2 py-1 text-center">
         <span className={`font-mono text-[13px] font-bold tabular-nums ${valueClass}`}>
           {goalsDisplay}
         </span>
       </TableCell>
-      <TableCell className="px-3 py-1.5">
+      <TableCell className="px-3 py-1">
         <div className="grid grid-cols-[36px_minmax(0,1fr)] items-center gap-1.5">
           <RedCardSlot align="left" redCards={match.awayRedCards} />
           <span className="truncate text-[13px] font-medium text-foreground">
@@ -99,28 +90,24 @@ export function TeamPanel({
   teamName,
   teamLogoUrl,
   accent,
-  marketGroupId,
   marketKey,
   matches,
   isLoading = false,
   emptyMessage = 'No historical data available.',
-  onMarketGroupChange,
-  onMarketKeyChange,
+  className,
 }: TeamPanelProps) {
   const { language, t } = useLanguage();
   const accentLabel = accent === 'left' ? t('Home') : t('Away');
-  const selectedGroup = getMarketGroup(marketGroupId);
-  const selectedLine = selectedGroup.lines.find((line) => line.key === marketKey) ?? selectedGroup.lines[0] ?? null;
-  const centerColumnLabel = getCenterColumnLabel(selectedLine?.key ?? marketKey, language);
+  const centerColumnLabel = getCenterColumnLabel(marketKey, language);
 
   return (
-    <section className="flex flex-col overflow-hidden rounded-md border border-border/60 bg-background shadow-sm">
-      <div className="flex items-center gap-3 border-b border-border/50 bg-muted/20 px-4 py-3">
+    <section className={cn('flex flex-col overflow-hidden rounded-[6px] border border-border/60 bg-background shadow-none', className)}>
+      <div className="flex items-center gap-3 border-b border-border/50 bg-muted/[0.06] px-4 py-2.5">
         <div className="flex shrink-0 items-center justify-center">
           {teamLogoUrl ? (
             <Image
               alt={`${teamName} logo`}
-              className="size-8 object-contain drop-shadow-sm"
+              className="size-8 object-contain"
               height={32}
               src={teamLogoUrl}
               width={32}
@@ -135,47 +122,13 @@ export function TeamPanel({
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <p className="truncate text-[15px] font-bold text-foreground">
+            <p className="truncate text-[15px] font-semibold text-foreground">
               {teamName}
             </p>
-            <span className="text-[12px] font-medium text-muted-foreground/80">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               {accentLabel}
             </span>
           </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 border-b border-border/50 bg-muted/10 px-4 py-3 md:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('Show stat type')}</label>
-          <Select value={marketGroupId} onValueChange={onMarketGroupChange}>
-            <SelectTrigger className="h-8 bg-background">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MARKET_GROUPS.map((group) => (
-                <SelectItem key={group.id} value={group.id}>
-                  {t(group.label)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{t('Highlight market')}</label>
-          <Select value={selectedLine?.key ?? ''} onValueChange={onMarketKeyChange}>
-            <SelectTrigger className="h-8 bg-background">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {selectedGroup.lines.map((line) => (
-                <SelectItem key={line.key} value={line.key}>
-                  {t(line.label)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -190,18 +143,18 @@ export function TeamPanel({
           </div>
         ) : (
           <Table>
-            <TableHeader className="bg-muted/30">
+            <TableHeader className="bg-muted/[0.08]">
               <TableRow className="border-border/50 hover:bg-transparent">
-                <TableHead className="h-8 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Date')}</TableHead>
-                <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Comp')}</TableHead>
-                <TableHead className="h-8 px-3 py-1 text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Home')}</TableHead>
-                <TableHead className="h-8 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{centerColumnLabel}</TableHead>
-                <TableHead className="h-8 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('Away')}</TableHead>
+                <TableHead className="h-9 px-3 py-1 text-left text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Date')}</TableHead>
+                <TableHead className="h-9 px-2 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Comp')}</TableHead>
+                <TableHead className="h-9 px-3 py-1 text-right text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Home')}</TableHead>
+                <TableHead className="h-9 px-2 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{centerColumnLabel}</TableHead>
+                <TableHead className="h-9 px-3 py-1 text-left text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Away')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {matches.map((match) => (
-                <MatchTableRow key={match.id} marketKey={selectedLine?.key ?? marketKey} match={match} />
+                <MatchTableRow key={match.id} marketKey={marketKey} match={match} />
               ))}
             </TableBody>
           </Table>
