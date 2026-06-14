@@ -42,27 +42,34 @@ function HeadToHeadRow({
   const valueClass = getMatchValueClass(match.hit);
   const rowClass = getMatchRowClass(match.hit);
 
+  const parts = match.date.split(' ');
+  const topDate = parts.length >= 2 ? `${parts[0]} ${parts[1]}` : match.date;
+  const bottomYear = parts.length >= 3 ? parts[2] : '';
+
   return (
     <TableRow className={`border-border/50 hover:bg-muted/30 ${rowClass}`}>
-      <TableCell className="whitespace-nowrap px-3 py-1 font-mono text-[12px] tabular-nums text-muted-foreground">
-        {match.date}
+      <TableCell className="whitespace-nowrap px-2 py-1 font-mono tabular-nums text-muted-foreground">
+        <div className="flex flex-col items-center justify-center">
+          <span className="text-[11px] font-semibold leading-[1.2] text-foreground/90">{topDate}</span>
+          {bottomYear ? <span className="text-[9px] leading-[1.2] text-muted-foreground/70">{bottomYear}</span> : null}
+        </div>
       </TableCell>
-      <TableCell className="px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+      <TableCell className="px-1.5 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {match.competitionLabel}
       </TableCell>
-      <TableCell className="px-3 py-1">
-        <div className="grid grid-cols-[minmax(0,1fr)_36px] items-center gap-2">
-          <span className="truncate text-right text-[13px] font-semibold text-foreground">{match.homeTeamName}</span>
+      <TableCell className="px-2 py-1">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1">
+          <span className="truncate text-right text-[12px] font-semibold text-foreground sm:text-[13px]">{match.homeTeamName}</span>
           <RedCardSlot align="right" redCards={match.homeRedCards} />
         </div>
       </TableCell>
-      <TableCell className="px-2 py-1 text-center">
-        <span className={`font-mono text-[13px] font-bold tabular-nums ${valueClass}`}>{displayValue}</span>
+      <TableCell className="px-1.5 py-1 text-center">
+        <span className={`font-mono text-[12px] font-bold tabular-nums sm:text-[13px] ${valueClass}`}>{displayValue}</span>
       </TableCell>
-      <TableCell className="px-3 py-1">
-        <div className="grid grid-cols-[36px_minmax(0,1fr)] items-center gap-2">
+      <TableCell className="px-2 py-1">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-1">
           <RedCardSlot align="left" redCards={match.awayRedCards} />
-          <span className="truncate text-[13px] font-semibold text-foreground">{match.awayTeamName}</span>
+          <span className="truncate text-[12px] font-semibold text-foreground sm:text-[13px]">{match.awayTeamName}</span>
         </div>
       </TableCell>
     </TableRow>
@@ -115,11 +122,11 @@ export function HeadToHeadPanel({
           <Table>
             <TableHeader className="bg-muted/[0.08]">
               <TableRow className="border-border/50 hover:bg-transparent">
-                <TableHead className="h-9 px-3 py-1 text-left text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Date')}</TableHead>
-                <TableHead className="h-9 px-2 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Comp')}</TableHead>
-                <TableHead className="h-9 px-3 py-1 text-right text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Home')}</TableHead>
-                <TableHead className="h-9 px-2 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{centerColumnLabel}</TableHead>
-                <TableHead className="h-9 px-3 py-1 text-left text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Away')}</TableHead>
+                <TableHead className="h-9 px-2 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Date')}</TableHead>
+                <TableHead className="h-9 px-1.5 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Comp')}</TableHead>
+                <TableHead className="h-9 px-2 py-1 text-right text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Home')}</TableHead>
+                <TableHead className="h-9 px-1.5 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{centerColumnLabel}</TableHead>
+                <TableHead className="h-9 px-2 py-1 text-left text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('Away')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

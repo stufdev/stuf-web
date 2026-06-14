@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, ChevronLeft, ChevronRight, Globe, Trophy, Users, Zap } from 'lucide-react';
+import { useLanguage } from '@/app/language-provider';
 import { fetchJson } from '@/lib/fetch-json';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -88,10 +89,10 @@ function updateUrl(params: Record<string, string | null>) {
   window.history.replaceState(null, '', query ? `${url.pathname}?${query}` : url.pathname);
 }
 
-const fmtDate = (iso: string) =>
-  new Intl.DateTimeFormat('en', { weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(iso));
-const fmtKickoff = (iso: string) =>
-  new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
+const fmtDate = (iso: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, { weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(iso));
+const fmtKickoff = (iso: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
 const fmtNum = (v: number | null | undefined, d = 2) =>
   v === null || v === undefined || Number.isNaN(Number(v)) ? '—' : Number(v).toFixed(d);
 const fmtTotal = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
@@ -104,6 +105,7 @@ const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P']);
 // ── Shared primitives ──────────────────────────────────────────────────────────
 
 function Eyebrow({ children, className }: { children: React.ReactNode; className?: string }) {
+  const { t } = useLanguage();
   return (
     <span
       className={cn(
@@ -150,6 +152,7 @@ function TabBar({
   onChange: (id: WorldCupTab) => void;
   liveCount: number;
 }) {
+  const { t } = useLanguage();
   return (
     <Tabs value={active} onValueChange={(value) => onChange(value as WorldCupTab)}>
       <TabsList
@@ -169,7 +172,7 @@ function TabBar({
               'data-[state=active]:after:opacity-100',
             )}
           >
-            {tab.label}
+            {t(tab.label)}
             {tab.id === 'fixtures' && liveCount > 0 ? (
               <span className="ml-1.5 inline-flex size-4 items-center justify-center rounded-full bg-red-500/15 text-[9px] font-bold text-red-500">
                 {liveCount}
@@ -192,6 +195,7 @@ function Segmented<T extends string>({
   value: T;
   onChange: (id: T) => void;
 }) {
+  const { t } = useLanguage();
   return (
     <ToggleGroup
       type="single"
@@ -209,7 +213,7 @@ function Segmented<T extends string>({
           value={opt.id}
           className="h-7 rounded-md border-0 px-3 text-xs font-medium data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
         >
-          {opt.label}
+          {t(opt.label)}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
@@ -226,6 +230,7 @@ function Chips<T extends string>({
   value: T;
   onChange: (id: T) => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {options.map((opt) => (
@@ -240,7 +245,7 @@ function Chips<T extends string>({
               : 'border-border/60 bg-background/70 text-muted-foreground hover:border-border hover:text-foreground',
           )}
         >
-          {opt.label}
+          {t(opt.label)}
         </button>
       ))}
     </div>
@@ -257,13 +262,14 @@ function SectionHead({
   title: string;
   action?: React.ReactNode;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="flex items-end justify-between gap-4 pb-4">
       <div className="flex items-center gap-3">
         <div className="h-8 w-0.5 rounded-full bg-gradient-to-b from-foreground/40 to-transparent" />
         <div className="flex flex-col gap-0.5">
-          <Eyebrow>{eyebrow}</Eyebrow>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
+          <Eyebrow>{t(eyebrow)}</Eyebrow>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">{t(title)}</h2>
         </div>
       </div>
       {action}
@@ -305,11 +311,12 @@ function HeroStatPill({
   label: string;
   icon: React.ElementType;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-background/60 px-3 py-2 backdrop-blur-sm">
       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
       <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs text-muted-foreground">{t(label)}</span>
     </div>
   );
 }
@@ -320,6 +327,7 @@ function fmtOddsPrice(price: number) {
 }
 
 function FixtureCenter({ fixture }: { fixture: WorldCupFixture }) {
+  const { locale, t } = useLanguage();
   if (FINISHED_STATUSES.has(fixture.statusShort ?? '')) {
     return (
       <div className="flex min-w-[80px] flex-col items-center justify-center gap-0.5">
@@ -348,13 +356,14 @@ function FixtureCenter({ fixture }: { fixture: WorldCupFixture }) {
   return (
     <div className="flex min-w-[80px] items-center justify-center">
       <span className="font-mono text-[13px] font-semibold leading-none tabular-nums text-foreground">
-        {fmtKickoff(fixture.date)}
+        {fmtKickoff(fixture.date, locale)}
       </span>
     </div>
   );
 }
 
 function FixtureOddsCell({ fixture }: { fixture: WorldCupFixture }) {
+  const { t } = useLanguage();
   const isSettled =
     FINISHED_STATUSES.has(fixture.statusShort ?? '') || LIVE_STATUSES.has(fixture.statusShort ?? '');
 
@@ -363,7 +372,7 @@ function FixtureOddsCell({ fixture }: { fixture: WorldCupFixture }) {
       <div className="flex min-w-[152px] items-center justify-center gap-1.5">
         {fixture.roundName ? (
           <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground/50">
-            {fixture.roundName}
+            {t(fixture.roundName)}
           </span>
         ) : null}
       </div>
@@ -393,6 +402,7 @@ function FixtureOddsCell({ fixture }: { fixture: WorldCupFixture }) {
 }
 
 function FixturesSection({ fixtures }: { fixtures: WorldCupFixture[] }) {
+  const { locale, t } = useLanguage();
   const grouped = useMemo(() => {
     const groups = new Map<string, WorldCupFixture[]>();
     for (const fixture of fixtures)
@@ -400,7 +410,7 @@ function FixturesSection({ fixtures }: { fixtures: WorldCupFixture[] }) {
     return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [fixtures]);
 
-  if (grouped.length === 0) return <EmptyState>No World Cup fixtures in range.</EmptyState>;
+  if (grouped.length === 0) return <EmptyState>{t('No World Cup fixtures in range.')}</EmptyState>;
 
   return (
     <div className="overflow-hidden rounded-[5px] border border-border/50 bg-background">
@@ -435,11 +445,11 @@ function FixturesSection({ fixtures }: { fixtures: WorldCupFixture[] }) {
                       <div className="flex items-center gap-2">
                         <span className="size-2 rounded-full bg-sky-500" />
                         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#171717] dark:text-foreground/90">
-                          {fmtDate(rows[0].date)}
+                          {fmtDate(rows[0].date, locale)}
                         </span>
                       </div>
                       <span className="font-mono text-[10px] tabular-nums text-[#4d4d4d] dark:text-muted-foreground">
-                        {rows.length} {rows.length === 1 ? 'match' : 'matches'}
+                        {rows.length} {rows.length === 1 ? t('match') : t('matches')}
                       </span>
                     </div>
                   </td>
@@ -591,7 +601,8 @@ function StandingsRow({ row, rank }: { row: WorldCupStandingRow; rank: number })
 }
 
 function StandingsSection({ groups }: { groups: WorldCupStandingsGroup[] }) {
-  if (groups.length === 0) return <EmptyState>No World Cup standings loaded.</EmptyState>;
+  const { t } = useLanguage();
+  if (groups.length === 0) return <EmptyState>{t('No World Cup standings loaded.')}</EmptyState>;
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {groups.map((group) => (
@@ -606,14 +617,15 @@ function StandingsSection({ groups }: { groups: WorldCupStandingsGroup[] }) {
               Group stage
             </Badge>
           </div>
-          <Table className="[&_td]:border-0 [&_th]:border-0">
+          <div className="overflow-x-auto w-full">
+<Table className="[&_td]:border-0 [&_th]:border-0">
             <TableHeader>
               <TableRow className="border-border/40 bg-muted/10 hover:bg-muted/10">
                 <TableHead className="w-[36px] px-3 py-2 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
                   #
                 </TableHead>
                 <TableHead className="px-2 py-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                  Team
+                  {t('Team')}
                 </TableHead>
                 <TableHead className="w-[28px] px-1 py-2 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
                   P
@@ -641,10 +653,11 @@ function StandingsSection({ groups }: { groups: WorldCupStandingsGroup[] }) {
               ))}
             </TableBody>
           </Table>
+</div>
           {/* Qualification legend */}
           <div className="flex items-center gap-2 border-t border-border/40 px-4 py-2">
             <span className="size-1.5 rounded-full bg-primary/60" />
-            <span className="text-[10px] text-muted-foreground">Top 2 qualify</span>
+            <span className="text-[10px] text-muted-foreground">{t('Top 2 qualify')}</span>
           </div>
         </Panel>
       ))}
@@ -654,6 +667,7 @@ function StandingsSection({ groups }: { groups: WorldCupStandingsGroup[] }) {
 
 // ── Team averages ──────────────────────────────────────────────────────────────
 function TeamAveragesSection({ teamAverages }: { teamAverages: WorldCupTeamAverage[] }) {
+  const { t } = useLanguage();
   const [metric, setMetric] = useState<TeamAverageMetric>('goals');
   const cfg = TEAM_AVERAGE_METRICS.find((m) => m.id === metric) ?? TEAM_AVERAGE_METRICS[0]!;
   const rows = useMemo(
@@ -662,13 +676,14 @@ function TeamAveragesSection({ teamAverages }: { teamAverages: WorldCupTeamAvera
   );
   const max = useMemo(() => Math.max(1, ...rows.map((r) => cfg.value(r) ?? 0)), [cfg, rows]);
 
-  if (teamAverages.length === 0) return <EmptyState>No team averages loaded.</EmptyState>;
+  if (teamAverages.length === 0) return <EmptyState>{t('No team averages loaded.')}</EmptyState>;
 
   return (
     <div className="flex flex-col gap-3">
       <Chips options={TEAM_AVERAGE_METRICS} value={metric} onChange={setMetric} />
       <Panel>
-        <Table className="[&_td]:border-0 [&_th]:border-0">
+        <div className="overflow-x-auto w-full">
+<Table className="[&_td]:border-0 [&_th]:border-0">
           <TableHeader>
             <TableRow className="border-border/40 bg-muted/10 hover:bg-muted/10">
               <TableHead className="w-[32px] px-3 py-2.5 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
@@ -678,10 +693,10 @@ function TeamAveragesSection({ teamAverages }: { teamAverages: WorldCupTeamAvera
                 Team
               </TableHead>
               <TableHead className="w-[64px] px-2 py-2.5 text-right text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                Matches
+                {t('Matches')}
               </TableHead>
               <TableHead className="w-[180px] px-3 py-2.5 text-right text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                {cfg.label} / match
+                {t(cfg.label)} / {t('match')}
               </TableHead>
               <TableHead className="w-[64px] px-3 py-2.5 text-right text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
                 GA
@@ -751,6 +766,7 @@ function TeamAveragesSection({ teamAverages }: { teamAverages: WorldCupTeamAvera
             })}
           </TableBody>
         </Table>
+</div>
       </Panel>
     </div>
   );
@@ -764,6 +780,7 @@ const RANK_STYLES: Record<number, { badge: string; text: string }> = {
 };
 
 function TopPlayersSection({ initialTopPlayers }: { initialTopPlayers: WorldCupTopPlayersResult }) {
+  const { t } = useLanguage();
   const [metric, setMetric] = useState<WorldCupPlayerMetric>(initialTopPlayers.metric);
   const [scope, setScope] = useState<WorldCupScope>(initialTopPlayers.scope);
   const [source, setSource] = useState<WorldCupPlayerSource>(initialTopPlayers.source);
@@ -802,7 +819,7 @@ function TopPlayersSection({ initialTopPlayers }: { initialTopPlayers: WorldCupT
         setResult(next);
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        setErrorMessage(error instanceof Error ? error.message : 'Top players could not be loaded.');
+        setErrorMessage(error instanceof Error ? error.message : t('Top players could not be loaded.'));
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -857,23 +874,24 @@ function TopPlayersSection({ initialTopPlayers }: { initialTopPlayers: WorldCupT
       ) : null}
 
       <Panel>
-        <Table className="[&_td]:border-0 [&_th]:border-0">
+        <div className="overflow-x-auto w-full">
+<Table className="[&_td]:border-0 [&_th]:border-0">
           <TableHeader>
             <TableRow className="border-border/40 bg-muted/10 hover:bg-muted/10">
               <TableHead className="w-[40px] px-3 py-2.5 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
                 #
               </TableHead>
               <TableHead className="px-2 py-2.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                Player
+                {t('Player')}
               </TableHead>
               <TableHead className="w-[96px] px-2 py-2.5 text-right text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                Starts (Sub)
+                {t('Starts')} ({t('Sub')})
               </TableHead>
               <TableHead className="w-[60px] px-2 py-2.5 text-right text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                Mins
+                {t('Mins')}
               </TableHead>
               <TableHead className="w-[160px] px-3 py-2.5 text-right text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                Total
+                {t('Total')}
               </TableHead>
               <TableHead className="w-[56px] px-3 py-2.5 text-right text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
                 /90
@@ -940,11 +958,11 @@ function TopPlayersSection({ initialTopPlayers }: { initialTopPlayers: WorldCupT
                                   className="text-sm font-medium text-foreground"
                                 />
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                  <span>Starts</span>
+                                  <span>{t('Starts')}</span>
                                   <span className="font-mono font-semibold text-foreground">{row.lineups}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                  <span>Minutes</span>
+                                  <span>{t('Minutes')}</span>
                                   <span className="font-mono font-semibold text-foreground">{row.minutes}</span>
                                 </div>
                               </div>
@@ -983,18 +1001,19 @@ function TopPlayersSection({ initialTopPlayers }: { initialTopPlayers: WorldCupT
             {!loading && result.rows.length === 0 ? (
               <TableRow>
                 <TableCell className="px-4 py-10 text-center text-sm text-muted-foreground" colSpan={6}>
-                  No rows for this source and metric yet.
+                  {t('No rows for this source and metric yet.')}
                 </TableCell>
               </TableRow>
             ) : null}
           </TableBody>
         </Table>
+</div>
       </Panel>
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <span className="font-mono text-xs text-muted-foreground tabular-nums">
-          {result.totalRows} players
+          {result.totalRows} {result.totalRows === 1 ? t('player') : t('players')}
         </span>
         <div className="flex items-center gap-2">
           <Button
@@ -1043,6 +1062,7 @@ function streakBadgeClass(streak: number): string {
 }
 
 function PlayerStreakRow({ row }: { row: WcPlayerStreakRow }) {
+  const { locale, t } = useLanguage();
   return (
     <TableRow className="border-border/40 transition-colors hover:bg-muted/20">
       <TableCell className="min-w-0 px-4 py-3">
@@ -1053,7 +1073,7 @@ function PlayerStreakRow({ row }: { row: WcPlayerStreakRow }) {
           <div className="flex min-w-0 items-center gap-1.5">
             <TeamIdentity logoUrl={row.team.logoUrl} name={row.team.name} className="text-xs text-muted-foreground" />
             <span className="text-muted-foreground/40">·</span>
-            <span className="truncate text-[10px] text-muted-foreground">{row.propLabel}</span>
+            <span className="truncate text-[10px] text-muted-foreground">{t(row.propLabel)}</span>
           </div>
         </div>
       </TableCell>
@@ -1067,7 +1087,7 @@ function PlayerStreakRow({ row }: { row: WcPlayerStreakRow }) {
           >
             {row.currentStreak}
           </span>
-          <span className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground">in a row</span>
+          <span className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground">{t('in a row')}</span>
         </div>
       </TableCell>
       <TableCell className="w-[80px] px-2 py-3 text-right">
@@ -1095,7 +1115,7 @@ function PlayerStreakRow({ row }: { row: WcPlayerStreakRow }) {
               ) : null}
             </span>
             {row.nextFixtureDate ? (
-              <span className="text-[10px] text-muted-foreground">{fmtDate(row.nextFixtureDate)}</span>
+              <span className="text-[10px] text-muted-foreground">{fmtDate(row.nextFixtureDate, locale)}</span>
             ) : null}
           </div>
         ) : (
@@ -1107,6 +1127,7 @@ function PlayerStreakRow({ row }: { row: WcPlayerStreakRow }) {
 }
 
 function PlayerStreaksSection({ initialStreaks }: { initialStreaks: WcPlayerStreaksResult }) {
+  const { t } = useLanguage();
   const [filterStr, setFilterStr] = useState<StreakFilter>(
     String(initialStreaks.minStreak) as StreakFilter,
   );
@@ -1162,24 +1183,25 @@ function PlayerStreaksSection({ initialStreaks }: { initialStreaks: WcPlayerStre
         </Panel>
       ) : result.rows.length === 0 ? (
         <EmptyState>
-          No active player streaks at {filterStr}+ in WC 2026 data yet.
+          {t('No active player streaks at')} {filterStr}+ {t('in WC 2026 data yet.')}
         </EmptyState>
       ) : (
         <Panel>
-          <Table className="[&_td]:border-0 [&_th]:border-0">
+          <div className="overflow-x-auto w-full">
+<Table className="[&_td]:border-0 [&_th]:border-0">
             <TableHeader>
               <TableRow className="border-border/40 bg-muted/10 hover:bg-muted/10">
                 <TableHead className="px-4 py-2.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
                   Player
                 </TableHead>
                 <TableHead className="w-[72px] px-2 py-2.5 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                  Streak
+                  {t('Streak')}
                 </TableHead>
                 <TableHead className="w-[80px] px-2 py-2.5 text-right text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                  Record
+                  {t('Record')}
                 </TableHead>
                 <TableHead className="px-4 py-2.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/60">
-                  Next Match
+                  {t('Next Match')}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -1189,6 +1211,7 @@ function PlayerStreaksSection({ initialStreaks }: { initialStreaks: WcPlayerStre
               ))}
             </TableBody>
           </Table>
+</div>
         </Panel>
       )}
 
@@ -1198,7 +1221,7 @@ function PlayerStreaksSection({ initialStreaks }: { initialStreaks: WcPlayerStre
           prefetch={false}
           className="flex items-center gap-1.5 rounded-md border border-border/50 bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground"
         >
-          Team form streaks
+          {t('Team form streaks')}
           <ArrowUpRight className="size-3" />
         </Link>
       </div>
@@ -1217,6 +1240,7 @@ export function WorldCupHubClient({
   standings,
   teamAverages,
 }: WorldCupHubClientProps) {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<WorldCupTab>(initialTab);
   const showAll = activeTab === 'all';
 
@@ -1249,15 +1273,15 @@ export function WorldCupHubClient({
             {/* Left: Title block */}
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
-                <Eyebrow>FIFA World Cup · Summer 2026</Eyebrow>
+                <Eyebrow>{t('FIFA World Cup · Summer 2026')}</Eyebrow>
                 {liveFixtureCount > 0 ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-red-500">
                     <span className="size-1.5 animate-pulse rounded-full bg-red-500" />
-                    Live · {liveFixtureCount}
+                    {t('Live')} · {liveFixtureCount}
                   </span>
                 ) : null}
               </div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">World Cup 2026</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('World Cup 2026')}</h1>
 
               {/* Stats pills */}
               <div className="flex flex-wrap items-center gap-2">
@@ -1273,7 +1297,7 @@ export function WorldCupHubClient({
               className="h-8 gap-2 rounded-xl border-border/60 bg-background/80 px-3 text-xs font-medium text-foreground backdrop-blur-sm"
             >
               <Zap className="size-3.5 text-amber-500" />
-              Evidence-powered
+              {t('Evidence-powered')}
             </Badge>
           </div>
 
@@ -1331,7 +1355,7 @@ export function WorldCupHubClient({
             <SectionHead eyebrow="Player props" title="Prop percentages" />
             <div className="flex h-32 items-center justify-center rounded-xl border border-border/60 bg-muted/10 text-sm text-muted-foreground">
               {/* Prop link cards han sido ocultados temporalmente por diseño. */}
-              Section is currently being refactored.
+              {t('Section is currently being refactored.')}
             </div>
           </section>
         )}
