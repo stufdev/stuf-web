@@ -31,7 +31,7 @@ export function TabsNav({ activeTab, onChange }: TabsNavProps) {
   const { t } = useLanguage();
 
   return (
-    <div className="flex items-stretch gap-1">
+    <div className="flex w-full items-stretch gap-1 overflow-x-auto scrollbar-hide pb-1">
       {COMPARISON_TABS.map((tab) => {
         const isActive = tab.id === activeTab;
         return (
@@ -40,7 +40,7 @@ export function TabsNav({ activeTab, onChange }: TabsNavProps) {
             type="button"
             onClick={() => onChange(tab.id)}
             className={cn(
-              'h-8 flex-1 whitespace-nowrap rounded-[5px] px-2 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors',
+              'h-8 flex-none whitespace-nowrap rounded-[5px] px-3 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors',
               isActive
                 ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950'
                 : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',

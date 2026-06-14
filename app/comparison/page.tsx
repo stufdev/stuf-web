@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, BarChart3, CalendarDays, Clock3, Goal, Sparkles, Send } from 'lucide-react';
+import { AlertCircle, BarChart3, CalendarDays, Clock3, Goal, Sparkles, Send, SlidersHorizontal } from 'lucide-react';
 import { getDateKey, getDateWindowKeys } from '@/lib/date';
 import { fetchJson } from '@/lib/fetch-json';
 import { fetchRecentFixtures, fetchUpcomingFixtures } from '@/lib/upcoming-fixtures';
@@ -79,20 +79,20 @@ function TeamIdentity({ align, initials, logoUrl, name, sideLabel }: TeamIdentit
     return (
         <div
             className={cn(
-                'flex min-w-0 items-center gap-3',
-                isRight ? 'sm:flex-row-reverse sm:text-right' : 'sm:text-left',
+                'flex min-w-0 flex-col items-center gap-1.5 text-center',
+                isRight ? 'sm:flex-row-reverse sm:text-right' : 'sm:flex-row sm:text-left',
             )}
         >
-            <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[5px] border border-border/70 bg-muted/15">
+            <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-[5px] border border-border/70 bg-muted/15 sm:size-10">
                 {logoUrl ? (
-                    <Image alt={`${name} logo`} className="size-7 object-contain" height={28} src={logoUrl} width={28} />
+                    <Image alt={`${name} logo`} className="size-6 object-contain sm:size-7" height={28} src={logoUrl} width={28} />
                 ) : (
-                    <span className="text-[12px] font-semibold uppercase text-muted-foreground">{initials}</span>
+                    <span className="text-[11px] font-semibold uppercase text-muted-foreground sm:text-[12px]">{initials}</span>
                 )}
             </div>
-            <div className="min-w-0 space-y-1">
-                <p className="truncate text-[15px] font-semibold tracking-tight text-foreground sm:text-base">{name}</p>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{sideLabel}</p>
+            <div className="min-w-0 space-y-0 sm:space-y-1">
+                <p className="line-clamp-2 text-[12px] font-semibold leading-tight tracking-tight text-foreground sm:truncate sm:text-[15px] sm:leading-normal">{name}</p>
+                <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground sm:text-[10px]">{sideLabel}</p>
             </div>
         </div>
     );
@@ -269,6 +269,7 @@ export default function ComparisonPage() {
     const [selectedMarketKey, setSelectedMarketKey] = useState(DEFAULT_MARKET_LINE.key);
     const [trendCategory, setTrendCategory] = useState<TrendCategoryId>('all');
     const [statisticsCategory, setStatisticsCategory] = useState<StatisticsCategoryId>('all');
+    const [showFiltersMobile, setShowFiltersMobile] = useState(false);
 
     const upcomingDateWindow = useMemo(() => getDateWindowKeys(UPCOMING_DATE_WINDOW_DAYS), []);
     const { errorMessage: fixturesErrorMessage, fixtures: upcomingFixtures, isLoading: isUpcomingLoading } = useUpcomingFixtures(upcomingDateWindow);
@@ -445,7 +446,7 @@ export default function ComparisonPage() {
                     <div className="overflow-hidden rounded-[6px] border border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))]">
                         <div className="px-4 py-3 sm:px-5 sm:py-3.5">
                             {effectiveFixture && homeTeam && awayTeam ? (
-                                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+                                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-x-6 sm:gap-y-2">
                                     <TeamIdentity
                                         align="left"
                                         initials={homeTeamInitials}
@@ -453,9 +454,9 @@ export default function ComparisonPage() {
                                         name={homeTeamNameDisplay}
                                         sideLabel={t('Home')}
                                     />
-                                    <div className="flex flex-col items-center px-5 text-center">
+                                    <div className="flex flex-col items-center px-1 text-center sm:px-5">
                                         <span className="text-[12px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/55">{t('vs')}</span>
-                                        <span className="mt-1 whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{competitionLabel}</span>
+                                        <span className="mt-1 line-clamp-2 text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:whitespace-nowrap sm:text-[10px]">{competitionLabel}</span>
                                         {fixtureDateLabel ? (
                                             <span className="whitespace-nowrap text-[11px] leading-4 text-muted-foreground/80">{fixtureDateLabel}</span>
                                         ) : null}
@@ -480,7 +481,24 @@ export default function ComparisonPage() {
                     </div>
 
                     <div className="overflow-hidden rounded-[6px] border border-border/60 bg-background">
-                        <div className="grid gap-2 px-4 py-2.5 xl:grid-cols-4">
+                        <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5 xl:hidden">
+                            <h2 className="text-sm font-semibold text-foreground">{t('Global Filters')}</h2>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-2 border-border/60 bg-muted/50 text-xs font-medium"
+                                onClick={() => setShowFiltersMobile((prev) => !prev)}
+                            >
+                                <SlidersHorizontal className="size-3.5" />
+                                {t('Filtros')}
+                            </Button>
+                        </div>
+                        <div
+                            className={cn(
+                                'grid gap-2 px-4 py-2.5 xl:grid-cols-4',
+                                showFiltersMobile ? 'grid' : 'hidden xl:grid',
+                            )}
+                        >
 
                             <div className="flex h-11 items-center overflow-hidden rounded-[6px] border border-border/60 bg-muted/[0.08]">
                                 <span className="flex h-full shrink-0 items-center px-3">
@@ -599,43 +617,7 @@ export default function ComparisonPage() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 border-t border-border/40 px-4 py-2.5">
-                            <div className="flex h-10 items-center overflow-hidden rounded-[6px] border border-border/60 bg-muted/[0.08]">
-                                <span className="flex h-full shrink-0 items-center px-3">
-                                    <BarChart3 className="size-3.5 text-muted-foreground" />
-                                </span>
-                                <Select value={selectedMarketGroupId} onValueChange={handleMarketGroupChange}>
-                                    <SelectTrigger className="h-10 flex-1 rounded-none border-0 bg-transparent px-3 shadow-none">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {MARKET_GROUPS.map((group) => (
-                                            <SelectItem key={group.id} value={group.id}>
-                                                {t(group.label)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
 
-                            <div className="flex h-10 items-center overflow-hidden rounded-[6px] border border-border/60 bg-muted/[0.08]">
-                                <span className="flex h-full shrink-0 items-center px-3">
-                                    <Sparkles className="size-3.5 text-muted-foreground" />
-                                </span>
-                                <Select value={selectedMarketKey} onValueChange={setSelectedMarketKey}>
-                                    <SelectTrigger className="h-10 flex-1 rounded-none border-0 bg-transparent px-3 shadow-none">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {getMarketGroup(selectedMarketGroupId).lines.map((line) => (
-                                            <SelectItem key={line.key} value={line.key}>
-                                                {t(line.label)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
                     </div>
 
                     <div className="overflow-hidden rounded-[6px] border border-border/60 bg-background px-3 py-2">
@@ -660,6 +642,43 @@ export default function ComparisonPage() {
 
                     {showRecentMatches ? (
                         <div className="flex flex-col gap-4">
+                            <div className="grid grid-cols-2 gap-2 overflow-hidden rounded-[6px] border border-border/60 bg-muted/10 px-4 py-2.5">
+                                <div className="flex h-10 items-center overflow-hidden rounded-[6px] border border-border/60 bg-background">
+                                    <span className="flex h-full shrink-0 items-center px-3">
+                                        <BarChart3 className="size-3.5 text-muted-foreground" />
+                                    </span>
+                                    <Select value={selectedMarketGroupId} onValueChange={handleMarketGroupChange}>
+                                        <SelectTrigger className="h-10 flex-1 rounded-none border-0 bg-transparent px-3 shadow-none">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {MARKET_GROUPS.map((group) => (
+                                                <SelectItem key={group.id} value={group.id}>
+                                                    {t(group.label)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="flex h-10 items-center overflow-hidden rounded-[6px] border border-border/60 bg-background">
+                                    <span className="flex h-full shrink-0 items-center px-3">
+                                        <Sparkles className="size-3.5 text-muted-foreground" />
+                                    </span>
+                                    <Select value={selectedMarketKey} onValueChange={setSelectedMarketKey}>
+                                        <SelectTrigger className="h-10 flex-1 rounded-none border-0 bg-transparent px-3 shadow-none">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {getMarketGroup(selectedMarketGroupId).lines.map((line) => (
+                                                <SelectItem key={line.key} value={line.key}>
+                                                    {t(line.label)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
                             {/* Unified: Home | Away tables + H2H in one bordered container */}
                             <div className="overflow-hidden rounded-[6px] border border-border/60">
                                 <div className="grid md:grid-cols-2">

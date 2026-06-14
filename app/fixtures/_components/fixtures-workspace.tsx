@@ -12,6 +12,7 @@ import {
   Filter,
   LoaderCircle,
   Radar,
+  SlidersHorizontal,
   Sparkles,
   Target,
   TriangleAlert,
@@ -31,6 +32,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   ScrollArea,
@@ -910,16 +912,18 @@ function HistoricalStatTile({
   value,
   threshold,
   showLabel = false,
+  className,
 }: {
-  label: string;
+  label: React.ReactNode;
   value: StatValue | null;
   threshold: number;
   showLabel?: boolean;
+  className?: string;
 }) {
   const hot = valueMeetsThreshold(value, threshold);
 
   return (
-    <div className="flex min-h-[46px] min-w-[88px] flex-col items-center justify-center px-2 py-1 text-center">
+    <div className={cn("flex min-h-[46px] min-w-[88px] flex-col items-center justify-center px-2 py-1 text-center", className)}>
       {showLabel ? (
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
       ) : null}
@@ -1201,93 +1205,85 @@ function ScannerMobileCards({
   const { locale, t } = useLanguage();
 
   return (
-    <div className="grid gap-4 lg:hidden">
+    <div className="grid gap-3 lg:hidden">
       {entries.map((entry) => {
         return (
           <Link className="group block" href={`/comparison?fixture=${entry.fixture.id}`} key={entry.fixture.id} prefetch={false}>
             <Card className="overflow-hidden border-border/60 bg-card/80 py-0 transition-all duration-200 hover:border-primary/25 hover:shadow-lg">
-              <CardContent className="p-0">
-                <div className="flex items-start justify-between gap-3 border-b border-border/50 px-4 py-3">
-                  <Badge variant="outline" className="rounded-md border-border/60 bg-background/70 px-2 py-1">
+              <CardContent className="p-3">
+                
+                {/* Compact Header */}
+                <div className="flex items-center justify-between pb-2 border-b border-border/50">
+                  <Badge variant="outline" className="rounded-md border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px]">
                     {entry.fixture.league_name ?? `${t('League')} ${entry.fixture.league_id}`}
                   </Badge>
-                  <div className="flex items-start gap-2">
-                    <div className="text-right">
-                      <p className="text-base font-semibold tabular-nums text-foreground">
-                        {formatKickoff(entry.fixture.date, locale)}
-                      </p>
-                      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                        {formatShortDate(entry.fixture.date, locale)}
-                      </p>
-                    </div>
-                    <ArrowUpRight className="mt-0.5 size-4 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] font-bold tabular-nums text-foreground">{formatKickoff(entry.fixture.date, locale)}</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{formatShortDate(entry.fixture.date, locale)}</span>
+                    <ArrowUpRight className="size-3 text-muted-foreground" />
                   </div>
                 </div>
 
-                <div className="space-y-4 px-4 py-4">
-                  <div className="space-y-2">
-                    <TeamLine
-                      logoUrl={entry.fixture.home_team_view?.logo_url ?? null}
-                      name={entry.fixture.home_team_view?.name ?? `Team ${entry.fixture.home_team_id}`}
-                      side="home"
-                    />
-                    <TeamLine
-                      logoUrl={entry.fixture.away_team_view?.logo_url ?? null}
-                      name={entry.fixture.away_team_view?.name ?? `Team ${entry.fixture.away_team_id}`}
-                      side="away"
-                    />
-                  </div>
+                {/* Teams */}
+                <div className="flex flex-col gap-1.5 py-2.5">
+                  <TeamLine
+                    logoUrl={entry.fixture.home_team_view?.logo_url ?? null}
+                    name={entry.fixture.home_team_view?.name ?? `Team ${entry.fixture.home_team_id}`}
+                    side="home"
+                  />
+                  <TeamLine
+                    logoUrl={entry.fixture.away_team_view?.logo_url ?? null}
+                    name={entry.fixture.away_team_view?.name ?? `Team ${entry.fixture.away_team_id}`}
+                    side="away"
+                  />
+                </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <HistoricalStatTile
-                      label={`${t('Home')} ${t('Split')}`}
-                      showLabel
-                      threshold={threshold}
-                      value={entry.stats.homeHome}
-                    />
-                    <HistoricalStatTile
-                      label={`${t('Home')} ${t('Overall')}`}
-                      showLabel
-                      threshold={threshold}
-                      value={entry.stats.homeAll}
-                    />
-                    <HistoricalStatTile
-                      label={`${t('Away')} ${t('Overall')}`}
-                      showLabel
-                      threshold={threshold}
-                      value={entry.stats.awayAll}
-                    />
-                    <HistoricalStatTile
-                      label={`${t('Away')} ${t('Split')}`}
-                      showLabel
-                      threshold={threshold}
-                      value={entry.stats.awayAway}
-                    />
-                  </div>
+                {/* 4 Stats Grid */}
+                <div className="grid grid-cols-4 gap-0.5 rounded-md border border-border/50 bg-muted/10 p-1">
+                  <HistoricalStatTile
+                    className="min-w-0 min-h-0 px-1 py-1"
+                    label={<>{t('Home')}<br/>{t('Split')}</>}
+                    showLabel
+                    threshold={threshold}
+                    value={entry.stats.homeHome}
+                  />
+                  <HistoricalStatTile
+                    className="min-w-0 min-h-0 px-1 py-1 border-l border-border/50"
+                    label={<>{t('Home')}<br/>{t('Overall')}</>}
+                    showLabel
+                    threshold={threshold}
+                    value={entry.stats.homeAll}
+                  />
+                  <HistoricalStatTile
+                    className="min-w-0 min-h-0 px-1 py-1 border-l border-border/50"
+                    label={<>{t('Away')}<br/>{t('Overall')}</>}
+                    showLabel
+                    threshold={threshold}
+                    value={entry.stats.awayAll}
+                  />
+                  <HistoricalStatTile
+                    className="min-w-0 min-h-0 px-1 py-1 border-l border-border/50"
+                    label={<>{t('Away')}<br/>{t('Split')}</>}
+                    showLabel
+                    threshold={threshold}
+                    value={entry.stats.awayAway}
+                  />
+                </div>
 
-                  <div className="grid gap-3 rounded-lg border border-border/60 bg-background/50 p-3 sm:grid-cols-[minmax(0,1fr)_104px] sm:items-end">
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        {t('Market prices')}
-                      </p>
-                      <div className="mt-2">
-                        {entry.decisionCards.some((card) => card.referencePrice !== null) ? (
-                          <MarketPriceRail cards={entry.decisionCards} />
-                        ) : (
-                          <p className="text-sm text-muted-foreground">{t('No prices')}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        {t('Signal fit')}
-                      </p>
-                      <div className="mt-2">
-                        <SignalAlignmentCell signal={entry.signal} />
-                      </div>
-                    </div>
+                {/* Footer */}
+                <div className="mt-3 flex items-center justify-between px-1">
+                  <div>
+                    {entry.decisionCards.some((card) => card.referencePrice !== null) ? (
+                      <MarketPriceRail cards={entry.decisionCards} />
+                    ) : (
+                      <p className="text-[10px] font-medium text-muted-foreground">{t('No prices')}</p>
+                    )}
+                  </div>
+                  <div>
+                    <SignalAlignmentCell signal={entry.signal} />
                   </div>
                 </div>
+
               </CardContent>
             </Card>
           </Link>
@@ -1296,7 +1292,6 @@ function ScannerMobileCards({
     </div>
   );
 }
-
 function ScannerMobileGroup({
   entries,
   threshold,
@@ -1364,6 +1359,7 @@ function ScannerView({ isActive }: { isActive: boolean }) {
   const [hideBelowThreshold, setHideBelowThreshold] = useState(false);
   const [loadingBoard, setLoadingBoard] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showFiltersMobile, setShowFiltersMobile] = useState(false);
 
   const selectedGroup = getMarketGroup(selectedGroupId);
   const selectedLine = selectedGroup.lines.find((line) => line.key === selectedMarketKey) ?? selectedGroup.lines[0] ?? null;
@@ -1448,7 +1444,25 @@ function ScannerView({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="rounded-2xl border border-border/50 bg-background px-2.5 py-2.5">
+      <div className="flex items-center justify-between xl:hidden">
+        <h2 className="text-lg font-bold text-foreground">{t('Scanner')}</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-2 border-border/60 bg-background/50 text-xs font-medium"
+          onClick={() => setShowFiltersMobile((prev) => !prev)}
+        >
+          <SlidersHorizontal className="size-3.5" />
+          {t('Filtros')}
+        </Button>
+      </div>
+
+      <section
+        className={cn(
+          'rounded-2xl border border-border/50 bg-background px-2.5 py-2.5 transition-all',
+          showFiltersMobile ? 'block' : 'hidden xl:block',
+        )}
+      >
         <div className="flex flex-wrap items-center gap-2 xl:flex-nowrap">
           <ScannerToolbarField className="xl:basis-[140px]" label={t('Market')}>
               <Select
